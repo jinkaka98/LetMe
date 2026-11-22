@@ -12,7 +12,8 @@
     "build": "tsc",
     "watch": "tsc -w",
     "start": "node dist/index.js",
-    "dev": "tsc && node dist/index.js"
+    "dev": "tsc && node dist/index.js",
+    "test": "node --test --experimental-strip-types test/mcpServer.test.ts"
   },
   "dependencies": {
     "@letme/shared": "*",

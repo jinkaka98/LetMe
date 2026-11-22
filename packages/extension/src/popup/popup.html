@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>LetMe</title>
+  <link rel="stylesheet" href="popup.css" />
+</head>
+<body>
+  <div class="popup-container">
+    <!-- Header -->
+    <header class="header">
+      <div class="logo">
+        <svg class="logo-icon" viewBox="0 0 128 128" width="22" height="22">
+          <rect width="128" height="128" rx="24" fill="#09090b" stroke="#27272a" stroke-width="4"/>
+          <path d="M32 0v128M64 0v128M96 0v128M0 32h128M0 64h128M0 96h128" stroke="#18181b" stroke-width="3"/>
+          <circle cx="64" cy="64" r="23" fill="none" stroke="#52525b" stroke-width="3" stroke-dasharray="4 2"/>
+          <path d="M28 44V28h16M100 44V28H84M28 84v16h16M100 84v16H84" fill="none" stroke="#fafafa" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/>
+          <circle cx="64" cy="64" r="9" fill="#ffffff"/>
+        </svg>
+        <span class="logo-text">LetMe</span>
+      </div>
+
+      <div class="header-right">
+        <div id="mcp-status" class="status-badge disconnected" title="MCP Server Bridge Status">
+          <span class="status-dot"></span>
+          <span id="mcp-status-text">MCP</span>
+        </div>
+        <button id="btn-tab-settings" class="icon-btn" title="Settings">⚙️</button>
+      </div>
+    </header>
+
+    <!-- Main Views -->
+    <main class="main-view">
+      <!-- Actions View -->
+      <div id="view-actions" class="view active">
+        <!-- Action 1: Element Inspector (Manual) -->
+        <section class="action-card">
+          <div class="card-header">
+            <span class="card-title">1. Element Inspector</span>
+            <span class="card-badge">Manual</span>
+          </div>
+          <button id="btn-start-inspect" class="btn-primary">
+            <span class="btn-icon">🎯</span>
+            <span id="label-start-inspect">Start Element Inspector</span>
+          </button>
+        </section>
+
+        <!-- Action 2: Multi-Element Pick -->
+        <section class="action-card">
+          <div class="card-header">
+            <span class="card-title">2. Multi-Element Stager</span>
+            <span class="card-badge">Diagnostic</span>
+          </div>
+          <button id="btn-multi-pick" class="btn-secondary btn-full">
+            <span class="btn-icon">👆</span> Pick Elements & Staging
+          </button>
+        </section>
+
+        <!-- Action 3: Screenshot -->
+        <section class="action-card">
+          <div class="card-header">
+            <span class="card-title">3. Screenshot Capture</span>
+          </div>
+          <div class="btn-group">
+            <button id="btn-shot-area" class="btn-secondary">
+              <span class="btn-icon">✂️</span> Area Crop
+            </button>
+            <button id="btn-shot-full" class="btn-secondary">
+              <span class="btn-icon">🖼️</span> Full Viewport
+            </button>
+          </div>
+        </section>
+
+        <!-- Action 4: AI Auto Bug Detection -->
+        <section class="action-card">
+          <div class="card-header">
+            <span class="card-title">4. AI Vision Auto-Detect</span>
+            <span id="badge-ai-provider" class="card-badge">AI Vision</span>
+          </div>
+          <button id="btn-auto-bug" class="btn-secondary btn-full">
+            <span class="btn-icon">🤖</span> Scan Page with AI Vision
+          </button>
+          <div id="ai-provider-info" class="card-footnote">Config: OpenRouter / Gemini in Settings ⚙️</div>
+        </section>
+      </div>
+
+      <!-- Settings View -->
+      <div id="view-settings" class="view">
+        <div class="settings-header">
+          <span class="settings-title">AI Vision API Settings</span>
+          <button id="btn-back-actions" class="link-btn">← Back</button>
+        </div>
+
+        <form id="form-settings" class="settings-form">
+          <div class="field">
+            <label for="select-provider">AI Provider:</label>
+            <select id="select-provider" class="select-field">
+              <option value="openrouter">OpenRouter (Recommended)</option>
+              <option value="gemini">Google Gemini (OpenAI-compatible)</option>
+              <option value="openai">OpenAI (Official)</option>
+              <option value="groq">Groq</option>
+              <option value="ollama">Ollama (Localhost)</option>
+              <option value="custom">Custom Endpoint...</option>
+            </select>
+          </div>
+
+          <div id="field-custom-url" class="field" style="display: none;">
+            <label for="input-base-url">Custom Base URL:</label>
+            <input type="text" id="input-base-url" placeholder="http://localhost:8000/v1" />
+            <span class="field-hint">e.g. http://localhost:11434/v1 or https://my-proxy/v1</span>
+          </div>
+
+          <div class="field">
+            <label for="input-api-key">API Key:</label>
+            <input type="password" id="input-api-key" placeholder="Enter API key..." />
+            <span id="api-key-hint" class="field-hint">Stored securely in local Chrome storage</span>
+          </div>
+
+          <div class="field">
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+              <label for="input-model">Vision Model:</label>
+              <button type="button" id="btn-fetch-models" class="fetch-btn" title="Auto-detect models from provider">
+                🔄 Load Models
+              </button>
+            </div>
+            <div class="model-input-wrap">
+              <select id="select-model" class="select-field" style="display: none;"></select>
+              <input type="text" id="input-model" placeholder="e.g. gpt-4o-mini" />
+            </div>
+            <span id="model-fetch-status" class="field-hint">Auto-detect with 🔄 or type manually</span>
+          </div>
+
+          <button type="submit" class="btn-primary">
+            Save Settings
+          </button>
+          <div id="settings-status" class="save-status"></div>
+        </form>
+      </div>
+    </main>
+
+    <!-- Footer -->
+    <footer class="footer">
+      <span>Shortcut: <kbd>Alt</kbd>+<kbd>Shift</kbd>+<kbd>I</kbd></span>
+      <span class="port-info">ws://127.0.0.1:8765</span>
+    </footer>
+  </div>
+
+  <script type="module" src="./popup.js"></script>
+</body>
+</html>

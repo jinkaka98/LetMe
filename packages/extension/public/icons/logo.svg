@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" width="128" height="128">
+  <rect width="128" height="128" rx="24" fill="#09090b" stroke="#27272a" stroke-width="2"/>
+  <!-- Pixel Grid -->
+  <path d="M32 0v128M64 0v128M96 0v128M0 32h128M0 64h128M0 96h128" stroke="#18181b" stroke-width="2"/>
+  <!-- Focus Ring -->
+  <circle cx="64" cy="64" r="23" fill="none" stroke="#52525b" stroke-width="2" stroke-dasharray="4 2"/>
+  <!-- Viewfinder Corner Brackets -->
+  <path d="M28 44V28h16M100 44V28H84M28 84v16h16M100 84v16H84" fill="none" stroke="#fafafa" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/>
+  <!-- Center Target Dot -->
+  <circle cx="64" cy="64" r="8" fill="#ffffff"/>
+</svg>

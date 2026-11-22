@@ -1,0 +1,10 @@
+{
+  "mcpServers": {
+    "letme": {
+      "command": "node",
+      "args": [
+        "/home/xixero/Dokumen/GitHub/LetMe/packages/mcp-server/dist/index.js"
+      ]
+    }
+  }
+}
