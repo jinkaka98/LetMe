@@ -91,7 +91,17 @@ export class AutoBugDetector {
     try {
       // 1. Capture viewport screenshot and scale to exact CSS viewport dimensions (fixes DPR coordinate drift)
       this.updateScanningStage('📸 Capturing High-Res Viewport Snapshot...');
+
+      // Temporarily hide HUD before capturing so scanner overlays don't obscure UI elements in the screenshot
+      const hudEl = document.getElementById('letme-scanner-hud');
+      if (hudEl) hudEl.style.display = 'none';
+      await new Promise((r) => requestAnimationFrame(() => setTimeout(r, 60)));
+
       const shotRes = await chrome.runtime.sendMessage({ type: 'CAPTURE_TAB' });
+
+      // Restore HUD visibility for progress feedback
+      if (hudEl) hudEl.style.display = 'block';
+
       const rawDataUrl: string = shotRes?.dataUrl || '';
       if (!rawDataUrl) throw new Error('Could not capture viewport for AI vision analysis.');
       
@@ -336,10 +346,10 @@ Array<{
     beam.appendChild(beamTrail);
     hudRoot.appendChild(beam);
 
-    // 2. Center Top HUD Card
+    // 2. Bottom HUD Card (bottom-anchored to avoid blocking top navigation bars)
     const card = document.createElement('div');
     card.style.position = 'absolute';
-    card.style.top = '24px';
+    card.style.bottom = '24px';
     card.style.left = '50%';
     card.style.transform = 'translateX(-50%)';
     card.style.backgroundColor = 'rgba(9, 9, 11, 0.95)';
@@ -1106,27 +1116,29 @@ Array<{
   }
 
   private async syncAllBugsToMcp(bugs: DetectedBug[], screenshotDataUrl: string) {
+    const reportCode = `LTM-AI-${Math.random().toString(36).substring(2, 6).toUpperCase()}-${Date.now().toString(36).slice(-3).toUpperCase()}`;
+
     // Format full report for the active element
     const fullMarkdownNotes = bugs
       .map((b, i) => {
         const bounds = this.resolvedBoundsMap.get(i);
         const elText = bounds?.elementSelector ? ` [${bounds.elementSelector}]` : '';
-        return `${i + 1}. [${b.severity.toUpperCase()}]${elText} ${b.title}: ${b.description} (Fix: ${b.fix || 'N/A'})`;
+        return `### Issue #${i + 1} [${b.severity.toUpperCase()}]${elText}\n- **Title**: ${b.title}\n- **Description**: ${b.description}\n- **Suggested Fix**: \`${b.fix || 'N/A'}\``;
       })
       .join('\n\n');
 
-    // Send single consolidated master inspection to MCP active element
+    // 1. Send consolidated master inspection to MCP active element
     await chrome.runtime.sendMessage({
       type: 'ELEMENT_CAPTURED',
       payload: {
-        id: `ai_bugs_${Date.now()}`,
+        id: reportCode,
         timestamp: Date.now(),
         url: window.location.href,
         pageTitle: document.title,
-        selector: `body [AI-Vision-Scan: ${bugs.length} Issues]`,
+        selector: `body [LetMe Batch #${reportCode}: ${bugs.length} Issues]`,
         tagName: 'AI-VISION-BUG-REPORT',
         classNames: ['letme-ai-bug-report'],
-        outerHtmlSnippet: `<!-- AI Vision Scan: ${bugs.length} Visual Defects Found on ${document.title} -->`,
+        outerHtmlSnippet: `<!-- LetMe AI Vision Scan: ${bugs.length} Issues Synced under ID [${reportCode}] on ${document.title} -->`,
         boxModel: {
           width: window.innerWidth,
           height: window.innerHeight,
@@ -1161,7 +1173,7 @@ Array<{
           warnings: bugs.map((b) => `[${b.severity.toUpperCase()}] ${b.title}: ${b.description}`),
         },
         computedStyles: {},
-        userInstructions: `Perbaiki ${bugs.length} bug visual dan masalah layout yang terdeteksi oleh AI Vision pada halaman ini.`,
+        userInstructions: `Perbaiki ${bugs.length} bug visual dan masalah layout pada laporan LetMe [${reportCode}].`,
         userBugNotes: fullMarkdownNotes,
         annotations: bugs.map((b, i) => {
           const bounds = this.resolvedBoundsMap.get(i);
@@ -1184,7 +1196,57 @@ Array<{
       },
     });
 
-    this.showToast(`⚡ Synced ${bugs.length} bugs to MCP! Pull them in AI chat via letme_get_active_element.`);
+    // 2. Generate Contextual AI Prompting with Unique Code
+    const promptLines: string[] = [];
+    promptLines.push(`⚡ [LETME MCP REPORT: ${reportCode}]`);
+    promptLines.push(`Saya baru saja menginspeksi halaman "${document.title}" (${window.location.href}) dan mengirimkan laporan ${bugs.length} isu visual ke LetMe MCP Bridge.`);
+    promptLines.push('');
+    promptLines.push(`👉 **PENTING UNTUK CODING AGENT**:`);
+    promptLines.push(`Panggil MCP tool \`letme_get_active_element(id="${reportCode}")\` untuk membaca data lengkap payload (screenshot visual dengan penanda, bounding box, CSS computed, selector DOM, dan diagnosa layout).`);
+    promptLines.push('');
+    promptLines.push(`Berikut ringkasan ${bugs.length} masalah visual yang perlu Anda selesaikan:`);
+    bugs.forEach((b, i) => {
+      const bounds = this.resolvedBoundsMap.get(i);
+      const targetStr = bounds?.elementSelector ? ` (\`${bounds.elementSelector}\`)` : '';
+      promptLines.push(`${i + 1}. [${b.severity.toUpperCase()}] **${b.title}**${targetStr}: ${b.description}`);
+      if (b.fix) {
+        promptLines.push(`   💡 Saran Solusi: \`${b.fix}\``);
+      }
+    });
+    promptLines.push('');
+    promptLines.push(`Tolong telusuri kode frontend proyek ini dan perbaiki seluruh masalah di atas.`);
+
+    const readyPrompt = promptLines.join('\n');
+
+    // 3. Auto-copy to Clipboard
+    try {
+      await navigator.clipboard.writeText(readyPrompt);
+    } catch {
+      const ta = document.createElement('textarea');
+      ta.value = readyPrompt;
+      ta.style.position = 'fixed';
+      ta.style.opacity = '0';
+      document.body.appendChild(ta);
+      ta.select();
+      document.execCommand('copy');
+      ta.remove();
+    }
+
+    // 4. Update Button Feedback & Toast
+    const btn = document.getElementById('letme-btn-sync-all-mcp') as HTMLButtonElement | null;
+    if (btn) {
+      const originalText = btn.innerHTML;
+      btn.innerHTML = `✓ Copied [${reportCode}]!`;
+      btn.style.background = '#10b981';
+      btn.style.color = '#ffffff';
+      setTimeout(() => {
+        btn.innerHTML = originalText;
+        btn.style.background = '#fafafa';
+        btn.style.color = '#09090b';
+      }, 2500);
+    }
+
+    this.showToast(`⚡ Synced to MCP & Copied Prompt [${reportCode}]! Tinggal Paste (Ctrl+V) di chat AI Anda.`);
   }
 
   clearPins() {

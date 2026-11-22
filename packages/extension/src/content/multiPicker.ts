@@ -553,10 +553,13 @@ export class MultiPicker {
     });
   }
 
-  private syncAllToMcp() {
+  private async syncAllToMcp() {
     if (this.stagedElements.length === 0) return;
 
-    this.stagedElements.forEach((item) => {
+    const batchId = `LTM-STG-${Math.random().toString(36).substring(2, 6).toUpperCase()}-${Date.now().toString(36).slice(-3).toUpperCase()}`;
+
+    // Send individual element snapshots
+    for (const item of this.stagedElements) {
       const snap: ElementSnapshot = {
         id: item.id,
         timestamp: item.timestamp,
@@ -587,9 +590,69 @@ export class MultiPicker {
         type: 'ELEMENT_CAPTURED',
         payload: snap,
       });
+    }
+
+    // Send consolidated master batch under batchId
+    const masterHtml = this.stagedElements.map((el, i) => `<!-- [${i + 1}] <${el.tagName}> ${el.selector} -->\n${el.outerHtml}`).join('\n\n');
+    const masterNotes = this.stagedElements.map((el, i) => `### Component #${i + 1}: <${el.tagName}> \`${el.selector}\`\n${el.userNote ? `- **User Note**: ${el.userNote}\n` : ''}- **Dimensions**: ${el.boxModel.width}px × ${el.boxModel.height}px\n- **Parent**: \`${el.layoutContext.parentTagName}\` (display: \`${el.layoutContext.display}\`)`).join('\n\n');
+
+    chrome.runtime.sendMessage({
+      type: 'ELEMENT_CAPTURED',
+      payload: {
+        id: batchId,
+        timestamp: Date.now(),
+        url: window.location.href,
+        pageTitle: document.title,
+        selector: `body [LetMe Staged Components: ${this.stagedElements.length} Items]`,
+        tagName: 'MULTI-ELEMENT-STAGE',
+        classNames: ['letme-staged-batch'],
+        outerHtmlSnippet: masterHtml,
+        innerTextSnippet: `Batch of ${this.stagedElements.length} elements from ${document.title}`,
+        boxModel: this.stagedElements[0].boxModel,
+        layoutContext: this.stagedElements[0].layoutContext,
+        layoutBugs: this.stagedElements[0].layoutBugs,
+        computedStyles: this.stagedElements[0].computedStyles,
+        screenshotBase64: this.stagedElements[0].screenshotBase64,
+        userInstructions: `Analisis dan perbarui ${this.stagedElements.length} komponen yang di-stage pada batch [${batchId}].`,
+        userBugNotes: masterNotes,
+        annotations: [],
+        viewport: {
+          width: window.innerWidth,
+          height: window.innerHeight,
+          devicePixelRatio: window.devicePixelRatio || 1,
+        },
+      },
     });
 
-    this.showToast(`🚀 Synced ${this.stagedElements.length} elements (with crops & diagnostics) to MCP!`);
+    // Generate Contextual AI Prompt
+    const promptLines: string[] = [];
+    promptLines.push(`📦 [LETME MULTI-ELEMENT STAGE: ${batchId}]`);
+    promptLines.push(`Saya telah menginspeksi dan mengirimkan ${this.stagedElements.length} komponen UI dari "${document.title}" (${window.location.href}) ke LetMe MCP Bridge.`);
+    promptLines.push('');
+    promptLines.push(`👉 **PENTING UNTUK CODING AGENT**:`);
+    promptLines.push(`Panggil MCP tool \`letme_get_active_element(id="${batchId}")\` untuk membaca data lengkap seluruh komponen ini (termasuk crop screenshot visual, HTML snippet, computed CSS, dan layout diagnostics).`);
+    promptLines.push('');
+    promptLines.push(`Berikut ringkasan ${this.stagedElements.length} komponen yang telah saya tandai:`);
+    this.stagedElements.forEach((item, idx) => {
+      promptLines.push(`${idx + 1}. <${item.tagName}> \`${item.selector}\`${item.userNote ? `\n   🎯 Catatan/Instruksi: "${item.userNote}"` : ''}`);
+    });
+    promptLines.push('');
+    promptLines.push(`Tolong analisis dan perbarui komponen di atas sesuai instruksi.`);
+
+    const readyPrompt = promptLines.join('\n');
+    await this.copyToClipboard(readyPrompt);
+
+    // Update button feedback
+    const btn = this.stagingDrawer?.querySelector('#letme-drawer-sync-mcp') as HTMLElement | null;
+    if (btn) {
+      const orig = btn.innerText;
+      btn.innerText = `✓ Copied [${batchId}]!`;
+      setTimeout(() => {
+        btn.innerText = orig;
+      }, 2500);
+    }
+
+    this.showToast(`🚀 Synced ${this.stagedElements.length} elements to MCP & copied prompt [${batchId}]! Tinggal Paste (Ctrl+V) di chat AI.`);
   }
 
   private showToast(message: string) {

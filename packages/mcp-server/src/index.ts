@@ -30,10 +30,15 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
       {
         name: 'letme_get_active_element',
         description:
-          'Retrieves the currently inspected/annotated frontend element from the browser, including annotated screenshot image, DOM selector, clean HTML snippet, box model metrics, wireframe layout context, layout bug diagnostics, and user styling instructions.',
+          'Retrieves the currently inspected/annotated frontend element or bug report session from the browser by ID (or the latest if omitted), including annotated screenshot image, DOM selector, clean HTML snippet, box model metrics, wireframe layout context, layout bug diagnostics, and user styling instructions.',
         inputSchema: {
           type: 'object',
-          properties: {},
+          properties: {
+            id: {
+              type: 'string',
+              description: 'Optional unique report ID or snapshot ID (e.g. LTM-AI-9A2F-8E1). If omitted, returns the latest active element or bug report.',
+            },
+          },
         },
       },
       {
@@ -103,7 +108,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
   try {
     switch (name) {
       case 'letme_get_active_element':
-        return handleGetActiveElement();
+        return handleGetActiveElement((args as any)?.id);
 
       case 'letme_list_inspections':
         return handleListInspections();

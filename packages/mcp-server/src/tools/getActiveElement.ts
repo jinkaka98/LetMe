@@ -1,15 +1,26 @@
 import { globalStore } from '../stateStore.js';
 import { ElementSnapshot } from '@letme/shared';
 
-export function handleGetActiveElement() {
-  const element = globalStore.getActiveElement();
+export function handleGetActiveElement(id?: string) {
+  let element = globalStore.getActiveElement();
+
+  if (id) {
+    const found = globalStore
+      .getSnapshots()
+      .find((s) => s.id === id || s.id.toLowerCase() === id.toLowerCase());
+    if (found) {
+      element = found;
+    }
+  }
 
   if (!element) {
     return {
       content: [
         {
           type: 'text' as const,
-          text: `No active element has been selected in the browser yet.\n\nPlease open your browser with the LetMe Chrome extension, click "Start Inspect", select an element, add any visual markup notes, and click "Send to AI".`,
+          text: id
+            ? `Report or snapshot with ID "${id}" was not found in LetMe MCP Server.\n\nPlease check active inspections with letme_list_inspections or capture a new inspection in the browser.`
+            : `No active element has been selected in the browser yet.\n\nPlease open your browser with the LetMe Chrome extension, click "Start Inspect", select an element, add any visual markup notes, and click "Send to AI".`,
         },
       ],
     };
@@ -18,6 +29,7 @@ export function handleGetActiveElement() {
   // Build structured Markdown presentation for the AI
   const lines: string[] = [];
   lines.push(`# Inspected Element: <${element.tagName.toLowerCase()}> \`${element.selector}\``);
+  lines.push(`- **Session / Report ID**: \`${element.id}\``);
   lines.push(`- **Page Title**: ${element.pageTitle}`);
   lines.push(`- **URL**: ${element.url}`);
   lines.push(`- **Timestamp**: ${new Date(element.timestamp).toISOString()}`);
