@@ -4,6 +4,7 @@ export interface DetectedBug {
   y: number;
   width?: number;
   height?: number;
+  target_text?: string;
   title: string;
   description: string;
   severity: 'critical' | 'warning' | 'suggestion';
@@ -17,6 +18,8 @@ export interface ResolvedBugBounds {
   height: number;
   docX: number;
   docY: number;
+  pinOffsetX: number;
+  pinOffsetY: number;
   elementTag?: string;
   elementSelector?: string;
   targetElement?: HTMLElement | null;
@@ -86,29 +89,42 @@ export class AutoBugDetector {
     this.showScanningHUD('Initializing AI Vision Scanner...');
 
     try {
-      // 1. Capture viewport screenshot
+      // 1. Capture viewport screenshot and scale to exact CSS viewport dimensions (fixes DPR coordinate drift)
       this.updateScanningStage('📸 Capturing High-Res Viewport Snapshot...');
       const shotRes = await chrome.runtime.sendMessage({ type: 'CAPTURE_TAB' });
-      const dataUrl: string = shotRes?.dataUrl || '';
-      if (!dataUrl) throw new Error('Could not capture viewport for AI vision analysis.');
-      this.currentScreenshot = dataUrl;
+      const rawDataUrl: string = shotRes?.dataUrl || '';
+      if (!rawDataUrl) throw new Error('Could not capture viewport for AI vision analysis.');
+      
+      const normalizedDataUrl = await this.rescaleImageToViewport(rawDataUrl, window.innerWidth, window.innerHeight);
+      this.currentScreenshot = normalizedDataUrl;
 
       // 2. Call OpenAI-compatible vision endpoint
       const endpoint = normalizeChatCompletionsUrl(baseUrl);
       this.updateScanningStage(`🧠 AI Vision (${model}) Analyzing Layout & Alignment...`);
 
-      const promptSystem = `You are an elite Frontend UI/UX and QA Engineer. Analyze the screenshot of this webpage to spot visual bugs, layout leaks, broken flex/grid wrapping, text clipping/overflow, unreadable contrast, stray elements, or misaligned elements.
-Return ONLY a valid JSON array of detected visual bugs matching this exact TypeScript interface:
+      const promptSystem = `You are an elite Frontend UI/UX and QA Engineer. Analyze the screenshot of this webpage (${window.innerWidth}px wide by ${window.innerHeight}px high) to spot visual bugs, layout leaks, broken flex/grid wrapping, text clipping/overflow, unreadable contrast, stray elements, or misaligned elements.
+
+For every issue found, provide:
+1. "x" and "y": The exact pixel coordinates (from left and top) within the ${window.innerWidth}x${window.innerHeight} viewport.
+2. "width" and "height": The approximate pixel dimensions of the affected element or area.
+3. "target_text": CRITICAL! Any distinct visible text, headline, or button label inside or directly next to the affected element (e.g. "ONLINE PUBLISHER", "PUBLISH YOUR AI MODE", "LOGIN", "Total revenue"). If it is an icon, badge, or image, state its label or surrounding text. This is used to locate the exact DOM element.
+4. "title": Short, crisp title of the bug.
+5. "description": Concise explanation of the problem.
+6. "severity": "critical" | "warning" | "suggestion".
+7. "fix": Concrete CSS or layout recommendation to fix it.
+
+Return ONLY a valid JSON array of objects matching this exact structure:
 Array<{
   id: number;
-  x: number; // pixel position from left
-  y: number; // pixel position from top
-  width: number; // approximate bug bounding box width
-  height: number; // approximate bug bounding box height
-  title: string; // short bug title
-  description: string; // concise explanation of the bug
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  target_text?: string;
+  title: string;
+  description: string;
   severity: "critical" | "warning" | "suggestion";
-  fix: string; // concrete CSS or layout advice to fix it
+  fix: string;
 }>`;
 
       const headers: Record<string, string> = {
@@ -137,7 +153,7 @@ Array<{
                   },
                   {
                     type: 'image_url',
-                    image_url: { url: dataUrl },
+                    image_url: { url: normalizedDataUrl },
                   },
                 ],
               },
@@ -223,13 +239,37 @@ Array<{
 
       this.currentBugs = bugs;
       this.renderBugPins(bugs);
-      this.renderFloatingDrawer(bugs, dataUrl);
+      this.renderFloatingDrawer(bugs, normalizedDataUrl);
       this.showToast(`🎯 Found ${bugs.length} visual issues! Check the highlighted elements & report drawer.`);
     } catch (err: any) {
       this.hideScanningHUD();
       console.error('[LetMe AutoBug] Error:', err);
       this.showModalAlert('Auto Bug Detection Failed', err.message);
     }
+  }
+
+  private async rescaleImageToViewport(rawUrl: string, targetWidth: number, targetHeight: number): Promise<string> {
+    return new Promise((resolve) => {
+      const img = new Image();
+      img.onload = () => {
+        try {
+          const canvas = document.createElement('canvas');
+          canvas.width = targetWidth;
+          canvas.height = targetHeight;
+          const ctx = canvas.getContext('2d');
+          if (ctx) {
+            ctx.drawImage(img, 0, 0, targetWidth, targetHeight);
+            resolve(canvas.toDataURL('image/jpeg', 0.9));
+          } else {
+            resolve(rawUrl);
+          }
+        } catch {
+          resolve(rawUrl);
+        }
+      };
+      img.onerror = () => resolve(rawUrl);
+      img.src = rawUrl;
+    });
   }
 
   // ─────────────────────────────────────────────────────────────
@@ -347,63 +387,148 @@ Array<{
   }
 
   // ─────────────────────────────────────────────────────────────
-  // 2. Intelligent DOM Element Snapping & Bounds Resolution
+  // 2. Intelligent Contextual DOM Snapping & Bounds Resolution
   // ─────────────────────────────────────────────────────────────
-  private resolveBugBounds(bug: DetectedBug): ResolvedBugBounds {
-    // 1. Try DOM element sniffing at the exact coordinate
-    let targetEl: HTMLElement | null = null;
-    try {
-      const elements = document.elementsFromPoint(bug.x, bug.y);
-      for (const el of elements) {
-        if (el instanceof HTMLElement) {
-          if (
-            el.tagName === 'BODY' ||
-            el.tagName === 'HTML' ||
-            el.closest('.letme-ui-root') ||
-            el.closest('.letme-autobug-element') ||
-            el.id?.startsWith('letme-') ||
-            el.className?.includes?.('letme-')
-          ) {
-            continue;
-          }
-          targetEl = el;
-          break;
-        }
-      }
-    } catch {}
+  private findElementByText(text: string, refX: number, refY: number): HTMLElement | null {
+    if (!text || text.trim().length < 2) return null;
+    const cleanSearch = text.trim().toLowerCase();
 
-    if (targetEl) {
-      const rect = targetEl.getBoundingClientRect();
-      // Ensure element has meaningful dimensions and isn't the entire viewport
+    const candidates: HTMLElement[] = [];
+    const elements = document.querySelectorAll<HTMLElement>(
+      'h1, h2, h3, h4, h5, h6, p, span, a, button, div, label, li, strong, b, code, input, [role="button"]'
+    );
+
+    for (const el of elements) {
       if (
-        rect.width >= 6 &&
-        rect.height >= 6 &&
-        rect.width <= window.innerWidth * 0.95 &&
-        rect.height <= window.innerHeight * 0.95
+        el.closest('.letme-ui-root') ||
+        el.closest('.letme-autobug-element') ||
+        el.id?.startsWith('letme-') ||
+        el.className?.includes?.('letme-')
       ) {
-        const tag = targetEl.tagName.toLowerCase();
-        const idStr = targetEl.id ? `#${targetEl.id}` : '';
-        const firstClass = targetEl.classList[0] ? `.${targetEl.classList[0]}` : '';
-        const selector = `${tag}${idStr || firstClass}`;
-        return {
-          x: Math.round(rect.left),
-          y: Math.round(rect.top),
-          width: Math.round(rect.width),
-          height: Math.round(rect.height),
-          docX: Math.round(rect.left + window.scrollX),
-          docY: Math.round(rect.top + window.scrollY),
-          elementTag: `<${tag}${idStr || firstClass}>`,
-          elementSelector: selector,
-          targetElement: targetEl,
-        };
+        continue;
+      }
+
+      const elText = (el.innerText || el.textContent || '').trim().toLowerCase();
+      if (!elText) continue;
+
+      if (elText === cleanSearch || elText.includes(cleanSearch) || cleanSearch.includes(elText)) {
+        const rect = el.getBoundingClientRect();
+        // Ignore hidden elements or giant wrappers
+        if (
+          rect.width >= 6 &&
+          rect.height >= 6 &&
+          rect.width <= window.innerWidth * 0.92 &&
+          rect.height <= window.innerHeight * 0.92
+        ) {
+          candidates.push(el);
+        }
       }
     }
 
-    // 2. Fallback to AI-provided bounding box if provided
+    if (candidates.length === 0) return null;
+    if (candidates.length === 1) return candidates[0];
+
+    // Pick candidate closest to (refX, refY)
+    let bestEl = candidates[0];
+    let minDistance = Infinity;
+
+    for (const el of candidates) {
+      const rect = el.getBoundingClientRect();
+      const cx = rect.left + rect.width / 2;
+      const cy = rect.top + rect.height / 2;
+      const dist = Math.hypot(cx - refX, cy - refY);
+      if (dist < minDistance) {
+        minDistance = dist;
+        bestEl = el;
+      }
+    }
+
+    return bestEl;
+  }
+
+  private findElementAtPoint(x: number, y: number): HTMLElement | null {
+    const testPoints = [
+      { x, y },
+      { x: x + 10, y: y + 10 },
+      { x: x - 10, y: y - 10 },
+      { x: x + 15, y },
+      { x, y: y + 15 },
+    ];
+
+    for (const pt of testPoints) {
+      try {
+        const elements = document.elementsFromPoint(pt.x, pt.y);
+        for (const el of elements) {
+          if (el instanceof HTMLElement) {
+            if (
+              el.tagName === 'BODY' ||
+              el.tagName === 'HTML' ||
+              el.closest('.letme-ui-root') ||
+              el.closest('.letme-autobug-element') ||
+              el.id?.startsWith('letme-') ||
+              el.className?.includes?.('letme-')
+            ) {
+              continue;
+            }
+            const rect = el.getBoundingClientRect();
+            if (
+              rect.width >= 10 &&
+              rect.height >= 8 &&
+              rect.width <= window.innerWidth * 0.92 &&
+              rect.height <= window.innerHeight * 0.92
+            ) {
+              return el;
+            }
+          }
+        }
+      } catch {}
+    }
+    return null;
+  }
+
+  private resolveBugBounds(bug: DetectedBug): ResolvedBugBounds {
+    // 1. Try DOM element sniffing by visible text first (most accurate!)
+    let targetEl: HTMLElement | null = null;
+    
+    // Extract quoted text from title/description if target_text isn't provided
+    const quoted = (bug.title + ' ' + (bug.description || '')).match(/['"‘“]([^'"’“”]{2,40})['"’“”]/)?.[1];
+    const searchText = bug.target_text || quoted;
+
+    if (searchText) {
+      targetEl = this.findElementByText(searchText, bug.x, bug.y);
+    }
+
+    // 2. If not found by text, try sniffing at the coordinate point
+    if (!targetEl) {
+      targetEl = this.findElementAtPoint(bug.x, bug.y);
+    }
+
+    if (targetEl) {
+      const rect = targetEl.getBoundingClientRect();
+      const tag = targetEl.tagName.toLowerCase();
+      const idStr = targetEl.id ? `#${targetEl.id}` : '';
+      const firstClass = targetEl.classList[0] ? `.${targetEl.classList[0]}` : '';
+      const selector = `${tag}${idStr || firstClass}`;
+      return {
+        x: Math.round(rect.left),
+        y: Math.round(rect.top),
+        width: Math.round(rect.width),
+        height: Math.round(rect.height),
+        docX: Math.round(rect.left + window.scrollX),
+        docY: Math.round(rect.top + window.scrollY),
+        pinOffsetX: 0,
+        pinOffsetY: 0,
+        elementTag: `<${tag}${idStr || firstClass}>`,
+        elementSelector: selector,
+        targetElement: targetEl,
+      };
+    }
+
+    // 3. Fallback to AI-provided bounding box if DOM sniffing misses
     const fallbackX = Math.round(Math.max(0, bug.x));
     const fallbackY = Math.round(Math.max(0, bug.y));
-    const w = (bug.width && bug.width > 10) ? Math.round(bug.width) : 140;
-    const h = (bug.height && bug.height > 10) ? Math.round(bug.height) : 48;
+    const w = (bug.width && bug.width > 10) ? Math.round(bug.width) : 120;
+    const h = (bug.height && bug.height > 10) ? Math.round(bug.height) : 40;
     return {
       x: fallbackX,
       y: fallbackY,
@@ -411,7 +536,9 @@ Array<{
       height: h,
       docX: fallbackX + window.scrollX,
       docY: fallbackY + window.scrollY,
-      elementTag: 'area',
+      pinOffsetX: 0,
+      pinOffsetY: 0,
+      elementTag: '<element>',
       targetElement: null,
     };
   }
@@ -457,8 +584,8 @@ Array<{
       }
 
       if (pin) {
-        pin.style.left = `${curX}px`;
-        pin.style.top = `${curY - 28}px`;
+        pin.style.left = `${curX + bounds.pinOffsetX}px`;
+        pin.style.top = `${curY + bounds.pinOffsetY}px`;
       }
     });
   }
@@ -469,23 +596,54 @@ Array<{
   private renderBugPins(bugs: DetectedBug[]) {
     this.resolvedBoundsMap.clear();
 
-    // Attach capture-phase scroll listener so inner container and page scrolls are caught
     if (!this.scrollListenerAttached) {
       window.addEventListener('scroll', this.handleScrollOrResize, { passive: true, capture: true });
       window.addEventListener('resize', this.handleScrollOrResize, { passive: true });
       this.scrollListenerAttached = true;
     }
 
+    // Track placed pins for collision avoidance (staggering)
+    const placedPins: { x: number; y: number }[] = [];
+
     bugs.forEach((bug, index) => {
       const bounds = this.resolveBugBounds(bug);
+
+      // Determine initial pin offset relative to element top-left
+      let pinOffsetX = 0;
+      let pinOffsetY = -24;
+
+      // If element is at the very top of viewport, place pin inside element
+      if (bounds.y + pinOffsetY < 4) {
+        pinOffsetY = 4;
+      }
+
+      let absPinX = bounds.x + pinOffsetX;
+      let absPinY = bounds.y + pinOffsetY;
+
+      // Stagger overlapping pins so they never stack on top of each other
+      for (const placed of placedPins) {
+        if (Math.abs(placed.x - absPinX) < 42 && Math.abs(placed.y - absPinY) < 22) {
+          pinOffsetX += 42; // Stagger to the right
+          absPinX = bounds.x + pinOffsetX;
+          if (absPinX + 50 > window.innerWidth) {
+            pinOffsetX = 0;
+            pinOffsetY += 24; // If overflowing screen width, shift down
+            absPinX = bounds.x + pinOffsetX;
+            absPinY = bounds.y + pinOffsetY;
+          }
+        }
+      }
+      placedPins.push({ x: absPinX, y: absPinY });
+
+      bounds.pinOffsetX = pinOffsetX;
+      bounds.pinOffsetY = pinOffsetY;
       this.resolvedBoundsMap.set(index, bounds);
 
       const color = bug.severity === 'critical' ? '#ef4444' : bug.severity === 'warning' ? '#f59e0b' : '#38bdf8';
-      const bgTint = bug.severity === 'critical' ? 'rgba(239, 68, 68, 0.14)' : bug.severity === 'warning' ? 'rgba(245, 158, 11, 0.14)' : 'rgba(56, 189, 248, 0.14)';
-      const shadowColor = bug.severity === 'critical' ? 'rgba(239, 68, 68, 0.35)' : bug.severity === 'warning' ? 'rgba(245, 158, 11, 0.35)' : 'rgba(56, 189, 248, 0.35)';
+      const bgTint = bug.severity === 'critical' ? 'rgba(239, 68, 68, 0.05)' : bug.severity === 'warning' ? 'rgba(245, 158, 11, 0.05)' : 'rgba(56, 189, 248, 0.05)';
+      const severityIcon = bug.severity === 'critical' ? '🔴' : bug.severity === 'warning' ? '🟡' : '🔵';
 
-      // 1. Prominent High-Contrast Element Bounding Box (Always Drawn for EVERY Bug!)
-      // NOTE: Transition MUST NOT animate top or left, ensuring instant 0ms latency on scroll!
+      // 1. Clean, subtle Bounding Box around element (no visual clutter)
       const box = document.createElement('div');
       box.id = `letme-bug-box-${index}`;
       box.className = 'letme-autobug-element letme-ui-root';
@@ -494,35 +652,24 @@ Array<{
       box.style.top = `${bounds.y}px`;
       box.style.width = `${bounds.width}px`;
       box.style.height = `${bounds.height}px`;
-      box.style.border = `2px solid ${color}`;
+      box.style.border = `2px dashed ${color}`;
       box.style.borderRadius = '6px';
       box.style.backgroundColor = bgTint;
-      box.style.boxShadow = `0 0 12px ${shadowColor}, inset 0 0 12px ${bgTint}`;
+      box.style.boxShadow = `0 0 0 1px rgba(0, 0, 0, 0.25)`;
       box.style.zIndex = '2147483640';
       box.style.pointerEvents = 'auto';
       box.style.cursor = 'pointer';
-      box.style.transition = 'background-color 0.15s, box-shadow 0.15s, transform 0.15s';
-
-      // Corner reticles for high-precision DevTools feel + Tag Badge
-      box.innerHTML = `
-        <div style="position:absolute; top:-2px; left:-2px; width:7px; height:7px; border-top:3px solid #ffffff; border-left:3px solid #ffffff; pointer-events:none;"></div>
-        <div style="position:absolute; top:-2px; right:-2px; width:7px; height:7px; border-top:3px solid #ffffff; border-right:3px solid #ffffff; pointer-events:none;"></div>
-        <div style="position:absolute; bottom:-2px; left:-2px; width:7px; height:7px; border-bottom:3px solid #ffffff; border-left:3px solid #ffffff; pointer-events:none;"></div>
-        <div style="position:absolute; bottom:-2px; right:-2px; width:7px; height:7px; border-bottom:3px solid #ffffff; border-right:3px solid #ffffff; pointer-events:none;"></div>
-        ${bounds.elementTag ? `
-          <div style="position:absolute; bottom:-20px; left:2px; font-size:9px; font-weight:700; color:#fafafa; background:#09090b; border:1px solid #27272a; padding:1px 6px; border-radius:3px; white-space:nowrap; pointer-events:none; font-family:monospace; box-shadow:0 2px 6px rgba(0,0,0,0.5);">
-            ${bounds.elementTag}
-          </div>
-        ` : ''}
-      `;
+      box.style.transition = 'background-color 0.15s, box-shadow 0.15s, border-color 0.15s, border-style 0.15s';
 
       box.addEventListener('mouseenter', () => {
-        box.style.backgroundColor = 'rgba(239, 68, 68, 0.28)';
-        box.style.boxShadow = `0 0 24px ${color}`;
+        box.style.borderStyle = 'solid';
+        box.style.backgroundColor = 'rgba(239, 68, 68, 0.15)';
+        box.style.boxShadow = `0 0 16px ${color}`;
       });
       box.addEventListener('mouseleave', () => {
+        box.style.borderStyle = 'dashed';
         box.style.backgroundColor = bgTint;
-        box.style.boxShadow = `0 0 12px ${shadowColor}, inset 0 0 12px ${bgTint}`;
+        box.style.boxShadow = `0 0 0 1px rgba(0, 0, 0, 0.25)`;
       });
 
       box.addEventListener('click', () => {
@@ -533,24 +680,60 @@ Array<{
       document.body.appendChild(box);
       this.activePins.push(box);
 
-      // 2. Interactive Pin badge attached directly on top of the box
+      // 2. Minimalist, sleek Pin Badge (Linear / Figma style)
       const pin = document.createElement('div');
       pin.id = `letme-bug-pin-${index}`;
       pin.className = 'letme-autobug-element letme-ui-root';
       pin.style.position = 'fixed';
-      pin.style.left = `${bounds.x}px`;
-      pin.style.top = `${bounds.y - 28}px`;
+      pin.style.left = `${absPinX}px`;
+      pin.style.top = `${absPinY}px`;
       pin.style.zIndex = '2147483645';
       pin.style.cursor = 'pointer';
       pin.style.fontFamily = '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
       pin.style.transition = 'transform 0.15s ease-out';
 
       pin.innerHTML = `
-        <div style="display: flex; align-items: center; gap: 5px; background: #09090b; border: 1.5px solid ${color}; padding: 3px 9px; border-radius: 9999px; box-shadow: 0 4px 14px rgba(0,0,0,0.7); color: #fafafa; font-size: 11px; font-weight: 700;">
-          <span style="color: ${color};">⚠️ #${index + 1}</span>
-          <span style="max-width: 170px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${bug.title}</span>
+        <div class="letme-pin-badge" style="display: inline-flex; align-items: center; gap: 4px; background: #09090b; border: 1.5px solid ${color}; padding: 2px 7px; border-radius: 9999px; box-shadow: 0 4px 12px rgba(0,0,0,0.6); color: #fafafa; font-size: 11px; font-weight: 800; white-space: nowrap; transition: all 0.15s ease;">
+          <span style="font-size: 9px;">${severityIcon}</span>
+          <span>#${index + 1}</span>
+        </div>
+        <div class="letme-pin-tooltip" style="position: absolute; bottom: calc(100% + 6px); left: 0; background: #09090b; border: 1px solid #27272a; color: #fafafa; padding: 5px 10px; border-radius: 6px; font-size: 11px; font-weight: 600; white-space: nowrap; pointer-events: none; opacity: 0; transform: translateY(4px); transition: all 0.15s ease; box-shadow: 0 8px 20px rgba(0,0,0,0.7); z-index: 2147483647; display: flex; align-items: center; gap: 6px;">
+          <span style="color: ${color}; font-weight: 800;">#${index + 1}</span>
+          <span style="max-width: 240px; overflow: hidden; text-overflow: ellipsis;">${bug.title}</span>
         </div>
       `;
+
+      pin.addEventListener('mouseenter', () => {
+        const badge = pin.querySelector('.letme-pin-badge') as HTMLElement | null;
+        const tooltip = pin.querySelector('.letme-pin-tooltip') as HTMLElement | null;
+        if (badge) {
+          badge.style.transform = 'scale(1.1)';
+          badge.style.borderColor = '#ffffff';
+          badge.style.boxShadow = `0 0 12px ${color}`;
+        }
+        if (tooltip) {
+          tooltip.style.opacity = '1';
+          tooltip.style.transform = 'translateY(0)';
+        }
+        box.style.borderStyle = 'solid';
+        box.style.boxShadow = `0 0 16px ${color}`;
+      });
+
+      pin.addEventListener('mouseleave', () => {
+        const badge = pin.querySelector('.letme-pin-badge') as HTMLElement | null;
+        const tooltip = pin.querySelector('.letme-pin-tooltip') as HTMLElement | null;
+        if (badge) {
+          badge.style.transform = '';
+          badge.style.borderColor = color;
+          badge.style.boxShadow = '0 4px 12px rgba(0,0,0,0.6)';
+        }
+        if (tooltip) {
+          tooltip.style.opacity = '0';
+          tooltip.style.transform = 'translateY(4px)';
+        }
+        box.style.borderStyle = 'dashed';
+        box.style.boxShadow = '0 0 0 1px rgba(0, 0, 0, 0.25)';
+      });
 
       pin.addEventListener('click', () => {
         this.focusBugCardInDrawer(index);
@@ -761,7 +944,8 @@ Array<{
         card.style.borderColor = '#3f3f46';
         const box = document.getElementById(`letme-bug-box-${origIndex}`);
         if (box) {
-          box.style.borderWidth = '3px';
+          box.style.borderStyle = 'solid';
+          box.style.borderWidth = '2px';
           box.style.boxShadow = `0 0 20px ${color}`;
         }
       });
@@ -770,8 +954,9 @@ Array<{
         card.style.borderColor = '#27272a';
         const box = document.getElementById(`letme-bug-box-${origIndex}`);
         if (box) {
+          box.style.borderStyle = 'dashed';
           box.style.borderWidth = '2px';
-          box.style.boxShadow = '';
+          box.style.boxShadow = '0 0 0 1px rgba(0, 0, 0, 0.25)';
         }
       });
 
@@ -827,11 +1012,15 @@ Array<{
   private scrollToBug(index: number) {
     const bounds = this.resolvedBoundsMap.get(index);
     if (bounds) {
-      window.scrollTo({
-        top: Math.max(0, bounds.y - 140),
-        left: Math.max(0, bounds.x - 100),
-        behavior: 'smooth',
-      });
+      if (bounds.targetElement && bounds.targetElement.isConnected) {
+        bounds.targetElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      } else {
+        window.scrollTo({
+          top: Math.max(0, bounds.docY - 140),
+          left: Math.max(0, bounds.docX - 100),
+          behavior: 'smooth',
+        });
+      }
     }
   }
 
@@ -853,9 +1042,9 @@ Array<{
       box.style.boxShadow = `0 0 30px ${color}, 0 0 12px #ffffff`;
       box.style.transform = 'scale(1.03)';
       setTimeout(() => {
-        box.style.border = `2px solid ${color}`;
+        box.style.border = `2px dashed ${color}`;
         box.style.backgroundColor = '';
-        box.style.boxShadow = '';
+        box.style.boxShadow = '0 0 0 1px rgba(0, 0, 0, 0.25)';
         box.style.transform = '';
       }, 1500);
     }
@@ -999,6 +1188,11 @@ Array<{
   }
 
   clearPins() {
+    if (this.scrollListenerAttached) {
+      window.removeEventListener('scroll', this.handleScrollOrResize, { capture: true } as any);
+      window.removeEventListener('resize', this.handleScrollOrResize);
+      this.scrollListenerAttached = false;
+    }
     this.activePins.forEach((p) => p.remove());
     this.activePins = [];
     this.resolvedBoundsMap.clear();
