@@ -1,0 +1,31 @@
+{
+  "name": "letme",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Visual Frontend UI/UX Inspector & Debugger via Model Context Protocol (MCP)",
+  "workspaces": [
+    "packages/*"
+  ],
+  "scripts": {
+    "build": "npm run build --workspaces",
+    "build:shared": "npm run build --workspace=@letme/shared",
+    "build:server": "npm run build --workspace=@letme/mcp-server",
+    "build:extension": "npm run build --workspace=@letme/extension",
+    "dev:server": "npm run dev --workspace=@letme/mcp-server",
+    "dev:extension": "npm run dev --workspace=@letme/extension",
+    "start:server": "node packages/mcp-server/dist/index.js",
+    "test": "npm run test --workspaces --if-present"
+  },
+  "keywords": [
+    "mcp",
+    "model-context-protocol",
+    "chrome-extension",
+    "frontend",
+    "ui-ux",
+    "debugging",
+    "inspector",
+    "wireframe"
+  ],
+  "author": "",
+  "license": "MIT"
+}
