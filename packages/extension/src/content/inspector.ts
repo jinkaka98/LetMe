@@ -41,7 +41,7 @@ export class ElementInspector {
     this.isActive = true;
     this.createHoverElements();
     this.attachEventListeners();
-    this.overlayUi?.showToast('🎯 LetMe Inspector Active: Hover and click any element to inspect');
+    this.overlayUi?.showToast('LetMe Inspector Active: Hover and click any element to inspect');
   }
 
   stop() {
@@ -258,7 +258,7 @@ export class ElementInspector {
         payload: snapshot,
       });
 
-      this.overlayUi?.showToast('🚀 Sent to AI via MCP! Your AI assistant now has this element.');
+      this.overlayUi?.showToast('Sent to AI via MCP! Your AI assistant now has this element.');
     } catch (err: any) {
       console.error('[LetMe] Error capturing element:', err);
       this.overlayUi?.showToast(`Error sending: ${err.message}`, true);

@@ -1,3 +1,5 @@
+import { getLucideSvg } from '../icons.js';
+
 export class ScreenshotTool {
   private overlay: HTMLDivElement | null = null;
   private selectionBox: HTMLDivElement | null = null;
@@ -201,9 +203,11 @@ export class ScreenshotTool {
       <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
         <div style="display: flex; align-items: center; gap: 8px;">
           <span style="font-weight: 700; font-size: 13px; color: #ffffff;">Screenshot Captured</span>
-          <span style="font-size: 11px; padding: 2px 6px; background: #27272a; border-radius: 4px; color: #10b981;">📋 Copied to Clipboard</span>
+          <span style="font-size: 11px; padding: 2px 6px; background: #27272a; border-radius: 4px; color: #10b981; display: inline-flex; align-items: center; gap: 4px;">
+            ${getLucideSvg('check', { size: 11, color: '#10b981' })} Copied to Clipboard
+          </span>
         </div>
-        <button id="letme-btn-close-modal" style="background: none; border: none; color: #a1a1aa; cursor: pointer; font-size: 16px;">✕</button>
+        <button id="letme-btn-close-modal" style="background: none; border: none; color: #a1a1aa; cursor: pointer; display: flex; align-items: center; justify-content: center; padding: 2px 4px; border-radius: 4px;">${getLucideSvg('x', { size: 14 })}</button>
       </div>
 
       <div style="border: 1px solid #27272a; border-radius: 6px; overflow: hidden; margin-bottom: 12px; background: #18181b; max-height: 180px; display: flex; align-items: center; justify-content: center;">
@@ -211,11 +215,11 @@ export class ScreenshotTool {
       </div>
 
       <div style="display: flex; gap: 8px;">
-        <button id="letme-btn-download" style="flex: 1; padding: 8px 12px; background: #18181b; border: 1px solid #27272a; color: #fafafa; border-radius: 6px; font-size: 12px; font-weight: 500; cursor: pointer;">
-          💾 Download PNG
+        <button id="letme-btn-download" style="flex: 1; padding: 8px 12px; background: #18181b; border: 1px solid #27272a; color: #fafafa; border-radius: 6px; font-size: 12px; font-weight: 500; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; gap: 6px;">
+          ${getLucideSvg('download', { size: 13 })} Download PNG
         </button>
-        <button id="letme-btn-send-mcp" style="flex: 1; padding: 8px 12px; background: #fafafa; border: 1px solid #ffffff; color: #09090b; border-radius: 6px; font-size: 12px; font-weight: 600; cursor: pointer;">
-          🚀 Send to MCP
+        <button id="letme-btn-send-mcp" style="flex: 1; padding: 8px 12px; background: #fafafa; border: 1px solid #ffffff; color: #09090b; border-radius: 6px; font-size: 12px; font-weight: 600; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; gap: 6px;">
+          ${getLucideSvg('zap', { size: 13, color: '#09090b' })} Send to MCP
         </button>
       </div>
     `;
@@ -281,7 +285,7 @@ export class ScreenshotTool {
 
       const btn = dialog.querySelector('#letme-btn-send-mcp') as HTMLButtonElement;
       if (btn) {
-        btn.innerText = '✅ Sent to AI via MCP!';
+        btn.innerHTML = `<span style="display:inline-flex; align-items:center; gap:4px;">${getLucideSvg('check', { size: 12, color: '#09090b' })} Sent to AI via MCP!</span>`;
         btn.disabled = true;
       }
       setTimeout(() => dialog.remove(), 2000);

@@ -9,6 +9,8 @@ class ExtensionBridgeService {
   private ws: WebSocket | null = null;
   private isConnected: boolean = false;
   private reconnectTimer: any = null;
+  private heartbeatTimer: any = null;
+  private pendingMessages: ClientMessage[] = [];
   private port: number = DEFAULT_WS_PORT;
 
   constructor() {
@@ -16,7 +18,41 @@ class ExtensionBridgeService {
   }
 
   getIsConnected(): boolean {
-    return this.isConnected;
+    return this.isConnected && this.ws !== null && this.ws.readyState === WebSocket.OPEN;
+  }
+
+  async ensureConnected(timeoutMs: number = 800): Promise<boolean> {
+    if (this.getIsConnected()) {
+      return true;
+    }
+
+    // Trigger connection if not already connecting
+    if (!this.ws || this.ws.readyState >= WebSocket.CLOSING) {
+      this.connect();
+    }
+
+    return new Promise((resolve) => {
+      if (this.getIsConnected()) {
+        resolve(true);
+        return;
+      }
+
+      const timer = setTimeout(() => {
+        resolve(this.getIsConnected());
+      }, timeoutMs);
+
+      const poll = setInterval(() => {
+        if (this.getIsConnected()) {
+          clearInterval(poll);
+          clearTimeout(timer);
+          resolve(true);
+        } else if (!this.ws || this.ws.readyState >= WebSocket.CLOSING) {
+          clearInterval(poll);
+          clearTimeout(timer);
+          resolve(false);
+        }
+      }, 40);
+    });
   }
 
   connect() {
@@ -30,6 +66,16 @@ class ExtensionBridgeService {
       this.ws.onopen = async () => {
         this.isConnected = true;
         console.log('[LetMe Background] Connected to MCP Bridge on ws://127.0.0.1:' + this.port);
+        this.startHeartbeat();
+        this.broadcastStatus(true);
+
+        // Flush any queued messages that were held while connecting
+        while (this.pendingMessages.length > 0) {
+          const queued = this.pendingMessages.shift();
+          if (queued) {
+            this.send(queued);
+          }
+        }
 
         // Register active tab if available
         const [activeTab] = await chrome.tabs.query({ active: true, currentWindow: true });
@@ -56,18 +102,60 @@ class ExtensionBridgeService {
 
       this.ws.onclose = () => {
         this.isConnected = false;
-        console.log('[LetMe Background] Bridge connection closed. Reconnecting...');
+        this.stopHeartbeat();
+        this.broadcastStatus(false);
+        console.log('[LetMe Background] Bridge connection closed. Reconnecting in 1s...');
         this.scheduleReconnect();
       };
 
       this.ws.onerror = (err) => {
         this.isConnected = false;
+        this.broadcastStatus(false);
         console.warn('[LetMe Background] Bridge connection error:', err);
       };
     } catch {
       this.isConnected = false;
+      this.broadcastStatus(false);
       this.scheduleReconnect();
     }
+  }
+
+  private startHeartbeat() {
+    this.stopHeartbeat();
+    this.heartbeatTimer = setInterval(() => {
+      if (this.ws && this.ws.readyState === WebSocket.OPEN) {
+        this.send({
+          type: 'PING',
+          payload: { timestamp: Date.now() },
+          timestamp: Date.now(),
+        });
+      }
+    }, 15000); // 15s keepalive keeps socket open and resets MV3 idle timer
+  }
+
+  private stopHeartbeat() {
+    if (this.heartbeatTimer) {
+      clearInterval(this.heartbeatTimer);
+      this.heartbeatTimer = null;
+    }
+  }
+
+  private broadcastStatus(connected: boolean) {
+    chrome.runtime.sendMessage({
+      type: 'MCP_STATUS_CHANGED',
+      connected,
+    }).catch(() => {});
+
+    chrome.tabs.query({}).then((tabs) => {
+      tabs.forEach((tab) => {
+        if (tab.id) {
+          chrome.tabs.sendMessage(tab.id, {
+            type: 'MCP_STATUS_CHANGED',
+            connected,
+          }).catch(() => {});
+        }
+      });
+    }).catch(() => {});
   }
 
   private scheduleReconnect() {
@@ -75,12 +163,19 @@ class ExtensionBridgeService {
     this.reconnectTimer = setTimeout(() => {
       this.reconnectTimer = null;
       this.connect();
-    }, 2500);
+    }, 1000);
   }
 
   send(message: ClientMessage) {
     if (this.ws && this.ws.readyState === WebSocket.OPEN) {
       this.ws.send(JSON.stringify(message));
+    } else {
+      // Queue message so it is transmitted as soon as the socket connects
+      this.pendingMessages.push(message);
+      if (this.pendingMessages.length > 50) {
+        this.pendingMessages.shift();
+      }
+      this.connect();
     }
   }
 
@@ -130,10 +225,12 @@ chrome.commands.onCommand.addListener(async (command) => {
 // Handle messages from content scripts and popup
 chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
   if (message.type === 'GET_MCP_STATUS') {
-    sendResponse({
-      connected: bridgeService.getIsConnected(),
+    bridgeService.ensureConnected(600).then((connected) => {
+      sendResponse({
+        connected,
+      });
     });
-    return false;
+    return true; // Keep message channel open for async response
   }
 
   if (message.type === 'ELEMENT_CAPTURED') {

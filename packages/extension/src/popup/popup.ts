@@ -66,9 +66,32 @@ function init() {
   // Clear legacy inspectMode flag if stored
   chrome.storage.local.remove('inspectMode');
 
-  // 1. Check MCP Status
+  // 1. Check MCP Status (Initial + Broadcasts + Polling)
   chrome.runtime.sendMessage({ type: 'GET_MCP_STATUS' }, (res) => {
     updateMcpStatus(res?.connected ?? false);
+  });
+
+  chrome.runtime.onMessage.addListener((msg) => {
+    if (msg.type === 'MCP_STATUS_CHANGED') {
+      updateMcpStatus(msg.connected ?? false);
+    }
+  });
+
+  const statusPollInterval = setInterval(() => {
+    chrome.runtime.sendMessage({ type: 'GET_MCP_STATUS' }, (res) => {
+      updateMcpStatus(res?.connected ?? false);
+    });
+  }, 1500);
+
+  window.addEventListener('unload', () => {
+    clearInterval(statusPollInterval);
+  });
+
+  statusBadge?.addEventListener('click', () => {
+    if (statusText) statusText.innerText = 'Connecting...';
+    chrome.runtime.sendMessage({ type: 'GET_MCP_STATUS' }, (res) => {
+      updateMcpStatus(res?.connected ?? false);
+    });
   });
 
   function updateMcpStatus(connected: boolean) {
@@ -131,7 +154,7 @@ function init() {
     const cleanBase = rawBase.replace(/\/+$/, '').replace(/\/chat\/completions$/, '');
     const modelsUrl = `${cleanBase}/models`;
 
-    if (modelFetchStatus) modelFetchStatus.innerText = '⏳ Fetching models...';
+    if (modelFetchStatus) modelFetchStatus.innerText = 'Fetching models...';
     btnFetchModels.disabled = true;
 
     try {
@@ -188,7 +211,7 @@ function init() {
       };
 
       if (modelFetchStatus) {
-        modelFetchStatus.innerText = `✓ Loaded ${modelIds.length} models!`;
+        modelFetchStatus.innerText = `Loaded ${modelIds.length} models!`;
       }
     } catch (err: any) {
       console.warn('[LetMe] Failed to fetch models:', err);
@@ -242,14 +265,14 @@ function init() {
       const baseUrl = data.aiBaseUrl || '';
 
       if (baseUrl.includes(':28120')) {
-        if (badgeAiProvider) badgeAiProvider.innerText = 'Fix Config ⚠️';
-        if (aiProviderInfo) aiProviderInfo.innerText = 'Base URL points to web app (28120). Click ⚙️';
+        if (badgeAiProvider) badgeAiProvider.innerText = 'Config Warning';
+        if (aiProviderInfo) aiProviderInfo.innerText = 'Base URL points to web app (28120). Open Settings.';
         return;
       }
 
       if (!key && p !== 'ollama') {
         if (badgeAiProvider) badgeAiProvider.innerText = 'Not Set';
-        if (aiProviderInfo) aiProviderInfo.innerText = 'Click ⚙️ Settings to enter API Key';
+        if (aiProviderInfo) aiProviderInfo.innerText = 'Open Settings tab to enter API Key';
         return;
       }
 
@@ -281,7 +304,7 @@ function init() {
     });
 
     if (settingsStatus) {
-      settingsStatus.innerText = '✓ Settings saved successfully!';
+      settingsStatus.innerText = 'Settings saved successfully!';
       setTimeout(() => {
         if (settingsStatus) settingsStatus.innerText = '';
       }, 2000);
@@ -362,7 +385,7 @@ function init() {
 
       if (baseUrl.includes(':28120')) {
         alert(
-          '⚠️ Invalid AI Vision Base URL:\n\n' +
+          'Invalid AI Vision Base URL:\n\n' +
           'Your AI Base URL is set to "http://localhost:28120", which is your local web app (Alpakyros), NOT an AI Vision LLM endpoint.\n\n' +
           'Switching to Settings tab now so you can select a real provider (e.g. Gemini, OpenRouter, or OpenAI).'
         );
@@ -374,7 +397,7 @@ function init() {
 
       if (!key && p !== 'ollama') {
         alert(
-          '⚠️ API Key Required:\n\n' +
+          'API Key Required:\n\n' +
           'AI Vision Auto Bug Detection requires an API Key.\n\n' +
           'Switching to Settings tab now so you can enter your API Key.'
         );

@@ -1,3 +1,4 @@
+import { getLucideSvg } from '../icons.js';
 import {
   getBoxModel,
   getContainerContext,
@@ -48,7 +49,7 @@ export class MultiPicker {
     this.createHoverOverlay();
     this.renderStagingPill();
     this.attachEvents();
-    this.showToast('👆 Multi-Pick Active: Click any element to pick and auto-copy to clipboard');
+    this.showToast('Multi-Pick Active: Click any element to pick and auto-copy to clipboard');
   }
 
   stop() {
@@ -237,7 +238,7 @@ export class MultiPicker {
     this.copyToClipboard(singleElementMarkdown);
 
     // 2. Toast notification
-    this.showToast(`📋 Copied <${item.tagName}> with Screenshot & Diagnostics! (${this.stagedElements.length} staged)`);
+    this.showToast(`Copied <${item.tagName}> with Screenshot & Diagnostics! (${this.stagedElements.length} staged)`);
 
     // 3. Update Staging Pill
     this.renderStagingPill();
@@ -248,7 +249,7 @@ export class MultiPicker {
 
   private formatSingleElementMarkdown(item: StagedElementInfo): string {
     const lines: string[] = [];
-    lines.push(`### 🎯 Target Element: <${item.tagName}> \`${item.selector}\``);
+    lines.push(`### Target Element: <${item.tagName}> \`${item.selector}\``);
     lines.push(`- **Function / Role**: \`${item.role || item.tagName}\``);
     if (item.textSummary) {
       lines.push(`- **Visible Text**: "${item.textSummary}"`);
@@ -259,16 +260,16 @@ export class MultiPicker {
     // Layout Diagnostics
     lines.push(`- **Layout Diagnostics**:`);
     if (item.layoutBugs.hasHorizontalScrollLeak) {
-      lines.push(`  - 🔴 Horizontal Scroll Leak Detected`);
+      lines.push(`  - Horizontal Scroll Leak Detected`);
     }
     if (item.layoutBugs.isClippedByAncestor) {
-      lines.push(`  - ⚠️ Ancestor Clipping by \`${item.layoutBugs.clippingAncestorSelector || 'unknown'}\``);
+      lines.push(`  - Ancestor Clipping by \`${item.layoutBugs.clippingAncestorSelector || 'unknown'}\``);
     }
     if (item.layoutBugs.hasZIndexConflict) {
-      lines.push(`  - ⚠️ Z-Index Conflict (z-index: \`${item.layoutBugs.zIndex}\`)`);
+      lines.push(`  - Z-Index Conflict (z-index: \`${item.layoutBugs.zIndex}\`)`);
     }
     if (item.layoutBugs.warnings.length === 0 && !item.layoutBugs.hasHorizontalScrollLeak) {
-      lines.push(`  - ✅ Clean layout bounds`);
+      lines.push(`  - Clean layout bounds`);
     }
 
     if (item.userNote) {
@@ -296,7 +297,7 @@ export class MultiPicker {
     if (this.stagedElements.length === 0) return 'No elements staged.';
 
     const lines: string[] = [];
-    lines.push(`# 📦 Staged Frontend Elements (${this.stagedElements.length} items from ${document.title})`);
+    lines.push(`# Staged Frontend Elements (${this.stagedElements.length} items from ${document.title})`);
     lines.push(`**URL**: ${window.location.href}`);
     lines.push(`**Captured At**: ${new Date().toISOString()}\n`);
 
@@ -312,11 +313,11 @@ export class MultiPicker {
       if (item.layoutBugs.hasHorizontalScrollLeak) bugNotes.push('Horizontal scroll leak');
       if (item.layoutBugs.isClippedByAncestor) bugNotes.push(`Clipped by ${item.layoutBugs.clippingAncestorSelector}`);
       if (item.layoutBugs.hasZIndexConflict) bugNotes.push(`Z-index collision (${item.layoutBugs.zIndex})`);
-      lines.push(`- **Layout Diagnostics**: ${bugNotes.length > 0 ? `⚠️ ${bugNotes.join(', ')}` : '✅ Clean'}`);
+      lines.push(`- **Layout Diagnostics**: ${bugNotes.length > 0 ? bugNotes.join(', ') : 'Clean'}`);
 
       // User instruction / bug note
       if (item.userNote) {
-        lines.push(`- **🎯 User Instruction / Bug Report**: > ${item.userNote}`);
+        lines.push(`- **User Instruction / Bug Report**: > ${item.userNote}`);
       }
 
       if (item.screenshotBase64) {
@@ -338,7 +339,7 @@ export class MultiPicker {
     // Console logs if any
     const recentLogs = getRecentConsoleLogs();
     if (recentLogs.length > 0) {
-      lines.push(`### ⚠️ Recent Console Logs:`);
+      lines.push(`### Recent Console Logs:`);
       recentLogs.slice(-5).forEach((log) => {
         lines.push(`- [${log.type.toUpperCase()}] ${log.message}`);
       });
@@ -382,19 +383,19 @@ export class MultiPicker {
 
     this.stagingPill.innerHTML = `
       <div style="display: flex; align-items: center; gap: 8px; background: #09090b; border: 1px solid #27272a; padding: 6px 12px; border-radius: 9999px; box-shadow: 0 10px 25px rgba(0,0,0,0.6); color: #fafafa; font-size: 12px;">
-        <span style="display: flex; align-items: center; gap: 6px; font-weight: 600;">
-          <span style="width: 8px; height: 8px; border-radius: 50%; background: #ffffff;"></span>
+        <span style="display: inline-flex; align-items: center; gap: 6px; font-weight: 600;">
+          <span style="display: inline-flex; align-items: center; color: #38bdf8;">${getLucideSvg('layers', { size: 14, color: '#38bdf8' })}</span>
           <span>${count} Staged</span>
         </span>
         <div style="width: 1px; height: 16px; background: #27272a;"></div>
-        <button id="letme-btn-copy-all" style="background: none; border: none; color: #a1a1aa; cursor: pointer; font-size: 12px; font-weight: 500; padding: 2px 6px; border-radius: 4px; display: flex; align-items: center; gap: 4px;">
-          📋 Copy All
+        <button id="letme-btn-copy-all" style="background: none; border: none; color: #a1a1aa; cursor: pointer; font-size: 12px; font-weight: 500; padding: 2px 6px; border-radius: 4px; display: inline-flex; align-items: center; gap: 4px;">
+          ${getLucideSvg('copy', { size: 12 })} <span>Copy All</span>
         </button>
-        <button id="letme-btn-toggle-list" style="background: #18181b; border: 1px solid #27272a; color: #fafafa; cursor: pointer; font-size: 11px; font-weight: 500; padding: 4px 8px; border-radius: 9999px;">
-          ${this.isDrawerOpen ? 'Close Drawer ▲' : 'Open Drawer ▾'}
+        <button id="letme-btn-toggle-list" style="background: #18181b; border: 1px solid #27272a; color: #fafafa; cursor: pointer; font-size: 11px; font-weight: 500; padding: 4px 8px; border-radius: 9999px; display: inline-flex; align-items: center; gap: 4px;">
+          <span>Drawer</span> ${this.isDrawerOpen ? getLucideSvg('chevron-up', { size: 11 }) : getLucideSvg('chevron-down', { size: 11 })}
         </button>
-        <button id="letme-btn-done" style="background: #fafafa; border: none; color: #09090b; cursor: pointer; font-size: 11px; font-weight: 600; padding: 4px 10px; border-radius: 9999px;">
-          Done
+        <button id="letme-btn-done" style="background: #fafafa; border: none; color: #09090b; cursor: pointer; font-size: 11px; font-weight: 600; padding: 4px 10px; border-radius: 9999px; display: inline-flex; align-items: center; gap: 4px;">
+          ${getLucideSvg('check', { size: 12, color: '#09090b' })} <span>Done</span>
         </button>
       </div>
     `;
@@ -402,7 +403,7 @@ export class MultiPicker {
     this.stagingPill.querySelector('#letme-btn-copy-all')?.addEventListener('click', () => {
       const allText = this.formatAllStagedMarkdown();
       this.copyToClipboard(allText);
-      this.showToast(`📋 Copied all ${this.stagedElements.length} elements to clipboard!`);
+      this.showToast(`Copied all ${this.stagedElements.length} elements to clipboard!`);
     });
 
     this.stagingPill.querySelector('#letme-btn-toggle-list')?.addEventListener('click', () => {
@@ -454,7 +455,9 @@ export class MultiPicker {
       ? `<div style="padding: 32px 16px; text-align: center; color: #71717a; font-size: 13px;">No elements in staging. Click any element on the page to add.</div>`
       : this.stagedElements.map((item, idx) => {
         const hasWarning = item.layoutBugs.hasHorizontalScrollLeak || item.layoutBugs.isClippedByAncestor || item.layoutBugs.hasZIndexConflict;
-        const diagBadge = hasWarning ? `<span style="color: #ef4444; font-size: 10px; font-weight: 700;">⚠️ Issue</span>` : `<span style="color: #10b981; font-size: 10px; font-weight: 700;">✅ Clean</span>`;
+        const diagBadge = hasWarning
+          ? `<span style="display:inline-flex; align-items:center; gap:3px; color: #ef4444; font-size: 10px; font-weight: 700;">${getLucideSvg('alert-triangle', { size: 11, color: '#ef4444' })} Issue</span>`
+          : `<span style="display:inline-flex; align-items:center; gap:3px; color: #10b981; font-size: 10px; font-weight: 700;">${getLucideSvg('check-circle-2', { size: 11, color: '#10b981' })} Clean</span>`;
 
         return `
           <div style="padding: 12px; border-bottom: 1px solid #18181b; background: #09090b; display: flex; flex-direction: column; gap: 8px;">
@@ -465,7 +468,7 @@ export class MultiPicker {
                 </span>
                 ${diagBadge}
               </div>
-              <button data-delete-id="${item.id}" style="background: none; border: none; color: #71717a; cursor: pointer; padding: 2px 6px; font-size: 14px;" title="Remove element">✕</button>
+              <button data-delete-id="${item.id}" style="background: none; border: none; color: #71717a; cursor: pointer; padding: 2px 6px; display: inline-flex; align-items: center;" title="Remove element">${getLucideSvg('x', { size: 13 })}</button>
             </div>
 
             <div style="display: flex; gap: 10px; align-items: center;">
@@ -494,7 +497,9 @@ export class MultiPicker {
     this.stagingDrawer.innerHTML = `
       <div style="padding: 12px 16px; background: #18181b; border-bottom: 1px solid #27272a; display: flex; justify-content: space-between; align-items: center;">
         <span style="font-size: 13px; font-weight: 600;">Staged Elements (${this.stagedElements.length})</span>
-        <button id="letme-btn-clear-all" style="background: none; border: none; color: #71717a; cursor: pointer; font-size: 11px;">Clear All</button>
+        <button id="letme-btn-clear-all" style="background: none; border: none; color: #71717a; cursor: pointer; font-size: 11px; display: inline-flex; align-items: center; gap: 4px;">
+          ${getLucideSvg('trash-2', { size: 11, color: '#71717a' })} <span>Clear All</span>
+        </button>
       </div>
 
       <div style="overflow-y: auto; flex: 1; max-height: 48vh;">
@@ -502,11 +507,11 @@ export class MultiPicker {
       </div>
 
       <div style="padding: 12px 16px; background: #18181b; border-top: 1px solid #27272a; display: flex; gap: 8px;">
-        <button id="letme-drawer-copy-all" style="flex: 1; padding: 8px 12px; background: #fafafa; border: none; border-radius: 6px; color: #09090b; font-size: 12px; font-weight: 600; cursor: pointer;">
-          📋 Copy All to AI
+        <button id="letme-drawer-copy-all" style="flex: 1; padding: 8px 12px; background: #fafafa; border: none; border-radius: 6px; color: #09090b; font-size: 12px; font-weight: 600; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; gap: 6px;">
+          ${getLucideSvg('copy', { size: 13, color: '#09090b' })} <span>Copy All to AI</span>
         </button>
-        <button id="letme-drawer-sync-mcp" style="flex: 1; padding: 8px 12px; background: #27272a; border: 1px solid #3f3f46; border-radius: 6px; color: #fafafa; font-size: 12px; font-weight: 500; cursor: pointer;">
-          🚀 Sync to MCP
+        <button id="letme-drawer-sync-mcp" style="flex: 1; padding: 8px 12px; background: #27272a; border: 1px solid #3f3f46; border-radius: 6px; color: #fafafa; font-size: 12px; font-weight: 500; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; gap: 6px;">
+          ${getLucideSvg('zap', { size: 13, color: '#fafafa' })} <span>Sync to MCP</span>
         </button>
       </div>
     `;
@@ -544,7 +549,7 @@ export class MultiPicker {
     this.stagingDrawer.querySelector('#letme-drawer-copy-all')?.addEventListener('click', () => {
       const allText = this.formatAllStagedMarkdown();
       this.copyToClipboard(allText);
-      this.showToast(`📋 All ${this.stagedElements.length} elements copied with notes & diagnostics!`);
+      this.showToast(`All ${this.stagedElements.length} elements copied with notes & diagnostics!`);
     });
 
     // Sync to MCP
@@ -626,15 +631,15 @@ export class MultiPicker {
 
     // Generate Contextual AI Prompt
     const promptLines: string[] = [];
-    promptLines.push(`📦 [LETME MULTI-ELEMENT STAGE: ${batchId}]`);
+    promptLines.push(`[LETME MULTI-ELEMENT STAGE: ${batchId}]`);
     promptLines.push(`Saya telah menginspeksi dan mengirimkan ${this.stagedElements.length} komponen UI dari "${document.title}" (${window.location.href}) ke LetMe MCP Bridge.`);
     promptLines.push('');
-    promptLines.push(`👉 **PENTING UNTUK CODING AGENT**:`);
+    promptLines.push(`**PENTING UNTUK CODING AGENT**:`);
     promptLines.push(`Panggil MCP tool \`letme_get_active_element(id="${batchId}")\` untuk membaca data lengkap seluruh komponen ini (termasuk crop screenshot visual, HTML snippet, computed CSS, dan layout diagnostics).`);
     promptLines.push('');
     promptLines.push(`Berikut ringkasan ${this.stagedElements.length} komponen yang telah saya tandai:`);
     this.stagedElements.forEach((item, idx) => {
-      promptLines.push(`${idx + 1}. <${item.tagName}> \`${item.selector}\`${item.userNote ? `\n   🎯 Catatan/Instruksi: "${item.userNote}"` : ''}`);
+      promptLines.push(`${idx + 1}. <${item.tagName}> \`${item.selector}\`${item.userNote ? `\n   Catatan/Instruksi: "${item.userNote}"` : ''}`);
     });
     promptLines.push('');
     promptLines.push(`Tolong analisis dan perbarui komponen di atas sesuai instruksi.`);
@@ -645,14 +650,14 @@ export class MultiPicker {
     // Update button feedback
     const btn = this.stagingDrawer?.querySelector('#letme-drawer-sync-mcp') as HTMLElement | null;
     if (btn) {
-      const orig = btn.innerText;
-      btn.innerText = `✓ Copied [${batchId}]!`;
+      const orig = btn.innerHTML;
+      btn.innerHTML = `<span style="display:inline-flex; align-items:center; gap:4px;">${getLucideSvg('check', { size: 12, color: '#fafafa' })} Copied [${batchId}]!</span>`;
       setTimeout(() => {
-        btn.innerText = orig;
+        btn.innerHTML = orig;
       }, 2500);
     }
 
-    this.showToast(`🚀 Synced ${this.stagedElements.length} elements to MCP & copied prompt [${batchId}]! Tinggal Paste (Ctrl+V) di chat AI.`);
+    this.showToast(`Synced ${this.stagedElements.length} elements to MCP & copied prompt [${batchId}]! Tinggal Paste (Ctrl+V) di chat AI.`);
   }
 
   private showToast(message: string) {

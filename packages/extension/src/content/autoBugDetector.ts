@@ -1,3 +1,5 @@
+import { getLucideSvg } from '../icons.js';
+
 export interface DetectedBug {
   id: number | string;
   x: number;
@@ -66,7 +68,7 @@ export class AutoBugDetector {
       this.showModalAlert(
         'AI Configuration Required',
         'AI Vision Auto Bug Detection requires an API Key.\n\n' +
-        'Please open the LetMe extension popup > Settings tab (⚙️) to select your AI provider (e.g. Google Gemini, OpenRouter, OpenAI, Groq) and enter your API Key.'
+        'Please open the LetMe extension popup > Settings to select your AI provider (e.g. Google Gemini, OpenRouter, OpenAI, Groq) and enter your API Key.'
       );
       return;
     }
@@ -78,7 +80,7 @@ export class AutoBugDetector {
         `Base URL "${baseUrl}" points to your local web dashboard (Alpakyros) instead of an AI Vision LLM endpoint.\n\n` +
         'How to fix:\n' +
         '1. Click the LetMe extension icon\n' +
-        '2. Click ⚙️ (Settings)\n' +
+        '2. Click Settings\n' +
         '3. Select an AI Provider (e.g. Google Gemini or OpenRouter)\n' +
         '4. Paste your API Key and click "Save Settings".'
       );
@@ -90,7 +92,7 @@ export class AutoBugDetector {
 
     try {
       // 1. Capture viewport screenshot and scale to exact CSS viewport dimensions (fixes DPR coordinate drift)
-      this.updateScanningStage('📸 Capturing High-Res Viewport Snapshot...');
+      this.updateScanningStage('Capturing High-Res Viewport Snapshot...');
 
       // Temporarily hide HUD before capturing so scanner overlays don't obscure UI elements in the screenshot
       const hudEl = document.getElementById('letme-scanner-hud');
@@ -110,7 +112,7 @@ export class AutoBugDetector {
 
       // 2. Call OpenAI-compatible vision endpoint
       const endpoint = normalizeChatCompletionsUrl(baseUrl);
-      this.updateScanningStage(`🧠 AI Vision (${model}) Analyzing Layout & Alignment...`);
+      this.updateScanningStage(`AI Vision (${model}) Analyzing Layout & Alignment...`);
 
       const promptSystem = `You are an elite Frontend UI/UX and QA Engineer. Analyze the screenshot of this webpage (${window.innerWidth}px wide by ${window.innerHeight}px high) to spot visual bugs, layout leaks, broken flex/grid wrapping, text clipping/overflow, unreadable contrast, stray elements, or misaligned elements.
 
@@ -187,19 +189,19 @@ Array<{
           throw new Error(
             `Endpoint returned HTTP 405 (Method Not Allowed).\n\n` +
             `"${endpoint}" does not support POST /chat/completions.\n\n` +
-            `Please configure a valid AI Vision provider (e.g. Google Gemini, OpenRouter, OpenAI, Groq, or Ollama) in LetMe Settings ⚙️.`
+            `Please configure a valid AI Vision provider (e.g. Google Gemini, OpenRouter, OpenAI, Groq, or Ollama) in LetMe Settings.`
           );
         }
         if (proxyRes.status === 404) {
           throw new Error(
             `Endpoint returned HTTP 404 (Not Found) at "${endpoint}".\n\n` +
-            `Please verify your AI Base URL in LetMe Settings ⚙️.`
+            `Please verify your AI Base URL in LetMe Settings.`
           );
         }
         if (proxyRes.status === 401 || proxyRes.status === 403) {
           throw new Error(
             `Authentication failed (HTTP ${proxyRes.status}).\n\n` +
-            `Your API Key appears to be invalid or unauthorized. Please verify your API Key in Settings ⚙️.`
+            `Your API Key appears to be invalid or unauthorized. Please verify your API Key in Settings.`
           );
         }
         throw new Error(`API Error (${proxyRes.status}): ${rawText}`);
@@ -212,7 +214,7 @@ Array<{
           `Possible causes:\n` +
           `1. Base URL was typed without "https://" (e.g. "sv4.alpakyros.com/v1" instead of "https://sv4.alpakyros.com/v1").\n` +
           `2. Base URL points to a frontend web app rather than an AI LLM gateway.\n\n` +
-          `Please update your Base URL in Settings ⚙️.`
+          `Please update your Base URL in Settings.`
         );
       }
 
@@ -238,19 +240,19 @@ Array<{
         throw new Error('AI Vision model did not return a valid JSON array format.');
       }
 
-      this.updateScanningStage(`🎯 Mapping ${bugs.length} detected visual issues & elements...`);
+      this.updateScanningStage(`Mapping ${bugs.length} detected visual issues & elements...`);
       await new Promise((r) => setTimeout(r, 400));
       this.hideScanningHUD();
 
       if (!Array.isArray(bugs) || bugs.length === 0) {
-        this.showToast('✅ AI Vision Analysis Complete: No visual bugs found!');
+        this.showToast('AI Vision Analysis Complete: No visual bugs found!');
         return;
       }
 
       this.currentBugs = bugs;
       this.renderBugPins(bugs);
       this.renderFloatingDrawer(bugs, normalizedDataUrl);
-      this.showToast(`🎯 Found ${bugs.length} visual issues! Check the highlighted elements & report drawer.`);
+      this.showToast(`Found ${bugs.length} visual issues! Check the highlighted elements & report drawer.`);
     } catch (err: any) {
       this.hideScanningHUD();
       console.error('[LetMe AutoBug] Error:', err);
@@ -365,13 +367,13 @@ Array<{
     card.style.pointerEvents = 'auto';
 
     card.innerHTML = `
-      <span style="display:inline-block; animation: letmeSpin 1.4s linear infinite; font-size:16px;">📡</span>
+      <span style="display:inline-flex; align-items:center; justify-content:center; animation: letmeSpin 1.4s linear infinite;">${getLucideSvg('radar', { size: 18, color: '#38bdf8' })}</span>
       <div style="display:flex; flex-direction:column;">
         <span style="font-size:11px; font-weight:800; letter-spacing:0.8px; text-transform:uppercase; color:#fafafa;">AI VISION SCANNER</span>
         <span id="letme-scanner-stage-text" style="font-size:12px; color:#38bdf8; font-weight:500;">${initialStage}</span>
       </div>
-      <button id="letme-scanner-cancel" style="background:#18181b; border:1px solid #27272a; color:#a1a1aa; padding:4px 10px; border-radius:9999px; font-size:11px; font-weight:600; cursor:pointer; margin-left:8px; transition: all 0.15s;">
-        Cancel ✕
+      <button id="letme-scanner-cancel" style="background:#18181b; border:1px solid #27272a; color:#a1a1aa; padding:4px 10px; border-radius:9999px; font-size:11px; font-weight:600; cursor:pointer; margin-left:8px; display:inline-flex; align-items:center; gap:4px; transition: all 0.15s;">
+        <span>Cancel</span> ${getLucideSvg('x', { size: 11 })}
       </button>
     `;
 
@@ -651,7 +653,11 @@ Array<{
 
       const color = bug.severity === 'critical' ? '#ef4444' : bug.severity === 'warning' ? '#f59e0b' : '#38bdf8';
       const bgTint = bug.severity === 'critical' ? 'rgba(239, 68, 68, 0.05)' : bug.severity === 'warning' ? 'rgba(245, 158, 11, 0.05)' : 'rgba(56, 189, 248, 0.05)';
-      const severityIcon = bug.severity === 'critical' ? '🔴' : bug.severity === 'warning' ? '🟡' : '🔵';
+      const severityIcon = bug.severity === 'critical'
+        ? getLucideSvg('alert-circle', { size: 11, color })
+        : bug.severity === 'warning'
+        ? getLucideSvg('alert-triangle', { size: 11, color })
+        : getLucideSvg('info', { size: 11, color });
 
       // 1. Clean, subtle Bounding Box around element (no visual clutter)
       const box = document.createElement('div');
@@ -704,7 +710,7 @@ Array<{
 
       pin.innerHTML = `
         <div class="letme-pin-badge" style="display: inline-flex; align-items: center; gap: 4px; background: #09090b; border: 1.5px solid ${color}; padding: 2px 7px; border-radius: 9999px; box-shadow: 0 4px 12px rgba(0,0,0,0.6); color: #fafafa; font-size: 11px; font-weight: 800; white-space: nowrap; transition: all 0.15s ease;">
-          <span style="font-size: 9px;">${severityIcon}</span>
+          <span style="display: inline-flex; align-items: center;">${severityIcon}</span>
           <span>#${index + 1}</span>
         </div>
         <div class="letme-pin-tooltip" style="position: absolute; bottom: calc(100% + 6px); left: 0; background: #09090b; border: 1px solid #27272a; color: #fafafa; padding: 5px 10px; border-radius: 6px; font-size: 11px; font-weight: 600; white-space: nowrap; pointer-events: none; opacity: 0; transform: translateY(4px); transition: all 0.15s ease; box-shadow: 0 8px 20px rgba(0,0,0,0.7); z-index: 2147483647; display: flex; align-items: center; gap: 6px;">
@@ -789,15 +795,15 @@ Array<{
       <!-- Header -->
       <div style="display:flex; justify-content:space-between; align-items:center; padding:12px 16px; border-bottom:1px solid #18181b; background:#121215;">
         <div style="display:flex; align-items:center; gap:8px;">
-          <span style="font-size:16px;">🤖</span>
+          <span style="display:inline-flex; align-items:center; color:#38bdf8;">${getLucideSvg('bot', { size: 16, color: '#38bdf8' })}</span>
           <span style="font-size:13px; font-weight:700; color:#fafafa;">AI Bug Report</span>
           <span style="background:#27272a; color:#fafafa; font-size:10px; font-weight:700; padding:2px 7px; border-radius:9999px;">
             ${bugs.length} Issues
           </span>
         </div>
         <div style="display:flex; align-items:center; gap:6px;">
-          <button id="letme-drawer-minimize" title="Minimize drawer" style="background:none; border:1px solid #27272a; color:#a1a1aa; border-radius:6px; width:26px; height:26px; cursor:pointer; display:flex; align-items:center; justify-content:center; font-size:14px;">−</button>
-          <button id="letme-drawer-close" title="Dismiss all pins" style="background:none; border:1px solid #27272a; color:#a1a1aa; border-radius:6px; width:26px; height:26px; cursor:pointer; display:flex; align-items:center; justify-content:center; font-size:14px;">✕</button>
+          <button id="letme-drawer-minimize" title="Minimize drawer" style="background:none; border:1px solid #27272a; color:#a1a1aa; border-radius:6px; width:26px; height:26px; cursor:pointer; display:flex; align-items:center; justify-content:center;">${getLucideSvg('minus', { size: 13 })}</button>
+          <button id="letme-drawer-close" title="Dismiss all pins" style="background:none; border:1px solid #27272a; color:#a1a1aa; border-radius:6px; width:26px; height:26px; cursor:pointer; display:flex; align-items:center; justify-content:center;">${getLucideSvg('x', { size: 13 })}</button>
         </div>
       </div>
 
@@ -832,14 +838,14 @@ Array<{
       <div style="padding:12px 16px; border-top:1px solid #18181b; background:#121215; display:flex; flex-direction:column; gap:8px;">
         <div style="display:flex; gap:8px;">
           <button id="letme-btn-copy-all" style="flex:1; display:flex; align-items:center; justify-content:center; gap:6px; background:#18181b; border:1px solid #27272a; color:#fafafa; padding:8px 12px; border-radius:8px; font-size:12px; font-weight:600; cursor:pointer; transition:all 0.15s;">
-            📋 Copy All (Markdown)
+            ${getLucideSvg('copy', { size: 13 })} <span>Copy All (Markdown)</span>
           </button>
           <button id="letme-btn-sync-all-mcp" style="flex:1; display:flex; align-items:center; justify-content:center; gap:6px; background:#fafafa; border:none; color:#09090b; padding:8px 12px; border-radius:8px; font-size:12px; font-weight:700; cursor:pointer; transition:opacity 0.15s;">
-            ⚡ Send All to MCP
+            ${getLucideSvg('zap', { size: 13, color: '#09090b' })} <span>Send All to MCP</span>
           </button>
         </div>
-        <button id="letme-btn-clear-all" style="background:none; border:none; color:#71717a; font-size:11px; cursor:pointer; text-align:center;">
-          Clear All ${bugs.length} Pins & Close
+        <button id="letme-btn-clear-all" style="background:none; border:none; color:#71717a; font-size:11px; cursor:pointer; text-align:center; display:flex; align-items:center; justify-content:center; gap:5px; margin-top:2px;">
+          ${getLucideSvg('trash-2', { size: 12, color: '#71717a' })} <span>Clear All ${bugs.length} Pins & Close</span>
         </button>
       </div>
     `;
@@ -937,15 +943,18 @@ Array<{
         <p style="font-size:12px; color:#d4d4d8; line-height:1.45; margin:0;">${bug.description}</p>
         ${bug.fix ? `
           <div style="background:#18181b; border:1px solid #27272a; border-radius:6px; padding:6px 8px; font-size:11px;">
-            <span style="color:#a1a1aa; font-weight:600;">💡 Fix: </span>
+            <span style="display:inline-flex; align-items:center; gap:4px; color:#a1a1aa; font-weight:600;">${getLucideSvg('lightbulb', { size: 12, color: '#f59e0b' })} Fix: </span>
             <span style="color:#38bdf8; font-family:monospace;">${bug.fix}</span>
           </div>
         ` : ''}
         <div style="display:flex; justify-content:space-between; align-items:center; margin-top:2px;">
-          <span style="font-size:10px; color:#71717a; font-family:monospace;">
-            ${bounds?.elementTag ? `🎯 ${bounds.elementTag} ` : ''}📍 (${bounds?.width || bug.width || 0}×${bounds?.height || bug.height || 0}px)
+          <span style="display:inline-flex; align-items:center; gap:6px; font-size:10px; color:#71717a; font-family:monospace;">
+            ${bounds?.elementTag ? `<span style="display:inline-flex; align-items:center; gap:3px;">${getLucideSvg('square', { size: 10, color: '#71717a' })} ${bounds.elementTag}</span>` : ''}
+            <span style="display:inline-flex; align-items:center; gap:3px;">${getLucideSvg('locate-fixed', { size: 10, color: '#71717a' })} (${bounds?.width || bug.width || 0}×${bounds?.height || bug.height || 0}px)</span>
           </span>
-          <span style="font-size:11px; color:#38bdf8; font-weight:600;">Focus Element ↗</span>
+          <span style="display:inline-flex; align-items:center; gap:4px; font-size:11px; color:#38bdf8; font-weight:600;">
+            <span>Focus Element</span> ${getLucideSvg('external-link', { size: 11, color: '#38bdf8' })}
+          </span>
         </div>
       `;
 
@@ -1002,9 +1011,13 @@ Array<{
     pill.style.alignItems = 'center';
     pill.style.gap = '8px';
     pill.innerHTML = `
-      <span>🤖</span>
-      <span>${totalBugs} Visual Bugs</span>
-      <span style="background:#18181b; border:1px solid #27272a; padding:2px 8px; border-radius:9999px; font-size:10px; color:#38bdf8;">Expand ↑</span>
+      <div style="display:inline-flex; align-items:center; gap:6px;">
+        ${getLucideSvg('bot', { size: 15, color: '#38bdf8' })}
+        <span>${totalBugs} Visual Bugs</span>
+      </div>
+      <span style="display:inline-flex; align-items:center; gap:4px; background:#18181b; border:1px solid #27272a; padding:2px 8px; border-radius:9999px; font-size:10px; color:#38bdf8;">
+        <span>Expand</span> ${getLucideSvg('chevron-up', { size: 11, color: '#38bdf8' })}
+      </span>
     `;
 
     pill.addEventListener('click', () => {
@@ -1081,7 +1094,7 @@ Array<{
   // ─────────────────────────────────────────────────────────────
   private copyAllBugsMarkdown(bugs: DetectedBug[]) {
     const lines: string[] = [];
-    lines.push(`# 🤖 LetMe AI Vision Bug Report`);
+    lines.push(`# LetMe AI Vision Bug Report`);
     lines.push(`- **Page Title**: ${document.title}`);
     lines.push(`- **URL**: ${window.location.href}`);
     lines.push(`- **Viewport**: ${window.innerWidth}px × ${window.innerHeight}px`);
@@ -1093,15 +1106,14 @@ Array<{
 
     bugs.forEach((b, i) => {
       const bounds = this.resolvedBoundsMap.get(i);
-      const severityEmoji = b.severity === 'critical' ? '🔴' : b.severity === 'warning' ? '🟡' : '🔵';
-      lines.push(`### ${i + 1}. ${severityEmoji} [${b.severity.toUpperCase()}] ${b.title}`);
+      lines.push(`### ${i + 1}. [${b.severity.toUpperCase()}] ${b.title}`);
       if (bounds?.elementSelector) {
         lines.push(`- **Target DOM Element**: \`${bounds.elementSelector}\``);
       }
       lines.push(`- **Bounding Box**: x: ${bounds?.x ?? b.x}px, y: ${bounds?.y ?? b.y}px, size: ${bounds?.width ?? b.width ?? 'auto'}px × ${bounds?.height ?? b.height ?? 'auto'}px`);
       lines.push(`- **Problem**: ${b.description}`);
       if (b.fix) {
-        lines.push(`- **💡 Suggested Fix**: \`${b.fix}\``);
+        lines.push(`- **Suggested Fix**: \`${b.fix}\``);
       }
       lines.push('');
     });
@@ -1111,7 +1123,7 @@ Array<{
 
     const markdown = lines.join('\n');
     navigator.clipboard.writeText(markdown).then(() => {
-      this.showToast(`📋 Copied all ${bugs.length} bug reports to clipboard! Ready to paste to AI.`);
+      this.showToast(`Copied all ${bugs.length} bug reports to clipboard! Ready to paste to AI.`);
     });
   }
 
@@ -1198,10 +1210,10 @@ Array<{
 
     // 2. Generate Contextual AI Prompting with Unique Code
     const promptLines: string[] = [];
-    promptLines.push(`⚡ [LETME MCP REPORT: ${reportCode}]`);
+    promptLines.push(`[LETME MCP REPORT: ${reportCode}]`);
     promptLines.push(`Saya baru saja menginspeksi halaman "${document.title}" (${window.location.href}) dan mengirimkan laporan ${bugs.length} isu visual ke LetMe MCP Bridge.`);
     promptLines.push('');
-    promptLines.push(`👉 **PENTING UNTUK CODING AGENT**:`);
+    promptLines.push(`**PENTING UNTUK CODING AGENT**:`);
     promptLines.push(`Panggil MCP tool \`letme_get_active_element(id="${reportCode}")\` untuk membaca data lengkap payload (screenshot visual dengan penanda, bounding box, CSS computed, selector DOM, dan diagnosa layout).`);
     promptLines.push('');
     promptLines.push(`Berikut ringkasan ${bugs.length} masalah visual yang perlu Anda selesaikan:`);
@@ -1210,7 +1222,7 @@ Array<{
       const targetStr = bounds?.elementSelector ? ` (\`${bounds.elementSelector}\`)` : '';
       promptLines.push(`${i + 1}. [${b.severity.toUpperCase()}] **${b.title}**${targetStr}: ${b.description}`);
       if (b.fix) {
-        promptLines.push(`   💡 Saran Solusi: \`${b.fix}\``);
+        promptLines.push(`   Saran Solusi: \`${b.fix}\``);
       }
     });
     promptLines.push('');
@@ -1236,7 +1248,7 @@ Array<{
     const btn = document.getElementById('letme-btn-sync-all-mcp') as HTMLButtonElement | null;
     if (btn) {
       const originalText = btn.innerHTML;
-      btn.innerHTML = `✓ Copied [${reportCode}]!`;
+      btn.innerHTML = `<span style="display:inline-flex; align-items:center; gap:4px;">${getLucideSvg('check', { size: 13, color: '#ffffff' })} Copied [${reportCode}]!</span>`;
       btn.style.background = '#10b981';
       btn.style.color = '#ffffff';
       setTimeout(() => {
@@ -1246,7 +1258,7 @@ Array<{
       }, 2500);
     }
 
-    this.showToast(`⚡ Synced to MCP & Copied Prompt [${reportCode}]! Tinggal Paste (Ctrl+V) di chat AI Anda.`);
+    this.showToast(`Synced to MCP & Copied Prompt [${reportCode}]! Tinggal Paste (Ctrl+V) di chat AI Anda.`);
   }
 
   clearPins() {
@@ -1298,7 +1310,9 @@ Array<{
 
     card.innerHTML = `
       <div style="display:flex; align-items:center; gap:10px;">
-        <span style="font-size:22px;">⚠️</span>
+        <span style="display:inline-flex; align-items:center; justify-content:center; width:28px; height:28px; border-radius:6px; background:rgba(245, 158, 11, 0.15);">
+          ${getLucideSvg('alert-triangle', { size: 16, color: '#f59e0b' })}
+        </span>
         <h3 style="margin:0; font-size:15px; font-weight:700; color:#fafafa;">${title}</h3>
       </div>
       <div style="font-size:13px; line-height:1.55; color:#a1a1aa; white-space:pre-wrap;">${message}</div>

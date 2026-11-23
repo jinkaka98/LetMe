@@ -236,7 +236,13 @@ body {
 }
 
 .btn-icon {
-  font-size: 12px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.btn-icon svg {
+  display: block;
 }
 
 /* Settings Form */
@@ -260,6 +266,42 @@ body {
   font-size: 11px;
   cursor: pointer;
   font-weight: 500;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 4px;
+  border-radius: 4px;
+  transition: all 0.15s;
+}
+
+.link-btn:hover {
+  color: #7dd3fc;
+  background: #18181b;
+}
+
+.fetch-btn {
+  background: #18181b;
+  border: 1px solid #27272a;
+  color: #a1a1aa;
+  padding: 3px 8px;
+  border-radius: 4px;
+  font-size: 10px;
+  font-weight: 600;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  transition: all 0.15s;
+}
+
+.fetch-btn:hover {
+  background: #27272a;
+  color: #ffffff;
+  border-color: #3f3f46;
+}
+
+.fetch-btn svg {
+  display: block;
 }
 
 .settings-form {

@@ -1,5 +1,6 @@
 import { BoxModelMetrics, LayoutBugReport } from '@letme/shared';
 import { MarkupStudio, MarkupTool } from './markupStudio.js';
+import { getLucideSvg } from '../icons.js';
 
 export interface OverlayCallbacks {
   onSendToAi: (instructions: string, bugNotes: string) => void;
@@ -12,6 +13,8 @@ export class OverlayUi {
   private markupStudio: MarkupStudio | null = null;
   private selectedElement: HTMLElement | null = null;
   private callbacks: OverlayCallbacks;
+  private statusInterval: any = null;
+  private statusListener: any = null;
 
   constructor(callbacks: OverlayCallbacks) {
     this.callbacks = callbacks;
@@ -65,20 +68,36 @@ export class OverlayUi {
           <span id="letme-status-text" style="color: #a1a1aa;">MCP Checking...</span>
         </span>
       </div>
-      <button id="letme-btn-close" style="background: none; border: none; color: #71717a; cursor: pointer; font-size: 14px; padding: 2px 6px; border-radius: 4px;">✕</button>
+      <button id="letme-btn-close" style="background: none; border: none; color: #71717a; cursor: pointer; display: flex; align-items: center; justify-content: center; padding: 2px 6px; border-radius: 4px;">${getLucideSvg('x', { size: 14 })}</button>
     `;
     this.container.appendChild(header);
 
-    // Query MCP status from background
-    chrome.runtime.sendMessage({ type: 'GET_MCP_STATUS' }, (res) => {
-      const isConnected = res?.connected ?? false;
+    // Query MCP status from background and keep synced
+    const updateStatusUI = (connected: boolean) => {
       const dot = this.container?.querySelector('#letme-status-dot') as HTMLElement | null;
       const txt = this.container?.querySelector('#letme-status-text') as HTMLElement | null;
       if (dot && txt) {
-        dot.style.background = isConnected ? '#10b981' : '#ef4444';
-        txt.innerText = isConnected ? 'MCP Connected' : 'MCP Offline';
+        dot.style.background = connected ? '#10b981' : '#ef4444';
+        txt.innerText = connected ? 'MCP Connected' : 'MCP Offline';
       }
+    };
+
+    chrome.runtime.sendMessage({ type: 'GET_MCP_STATUS' }, (res) => {
+      updateStatusUI(res?.connected ?? false);
     });
+
+    this.statusListener = (msg: any) => {
+      if (msg.type === 'MCP_STATUS_CHANGED') {
+        updateStatusUI(msg.connected ?? false);
+      }
+    };
+    chrome.runtime.onMessage.addListener(this.statusListener);
+
+    this.statusInterval = setInterval(() => {
+      chrome.runtime.sendMessage({ type: 'GET_MCP_STATUS' }, (res) => {
+        updateStatusUI(res?.connected ?? false);
+      });
+    }, 2000);
 
     // Body content
     const body = document.createElement('div');
@@ -118,7 +137,9 @@ export class OverlayUi {
 
       const warningItems = bugs.warnings.map((w) => `<li>${w}</li>`).join('');
       bugAlert.innerHTML = `
-        <div style="font-weight: 600; color: #f87171; margin-bottom: 2px;">⚠️ Layout Alert:</div>
+        <div style="font-weight: 600; color: #f87171; margin-bottom: 2px; display: flex; align-items: center; gap: 5px;">
+          ${getLucideSvg('alert-triangle', { size: 13, color: '#f87171' })} Layout Alert:
+        </div>
         <ul style="margin: 0; padding-left: 16px; color: #fca5a5;">
           ${warningItems}
         </ul>
@@ -138,19 +159,19 @@ export class OverlayUi {
     toolbar.style.alignItems = 'center';
 
     const tools: { id: MarkupTool; label: string; icon: string }[] = [
-      { id: 'pen', label: 'Draw', icon: '✏️' },
-      { id: 'arrow', label: 'Arrow', icon: '➡️' },
-      { id: 'box', label: 'Box', icon: '🔲' },
-      { id: 'text', label: 'Text', icon: '💬' },
-      { id: 'ruler', label: 'Ruler', icon: '📏' },
-      { id: 'blur', label: 'Blur', icon: '🔒' },
+      { id: 'pen', label: 'Draw', icon: getLucideSvg('pencil', { size: 12 }) },
+      { id: 'arrow', label: 'Arrow', icon: getLucideSvg('arrow-right', { size: 12 }) },
+      { id: 'box', label: 'Box', icon: getLucideSvg('square', { size: 12 }) },
+      { id: 'text', label: 'Text', icon: getLucideSvg('type', { size: 12 }) },
+      { id: 'ruler', label: 'Ruler', icon: getLucideSvg('ruler', { size: 12 }) },
+      { id: 'blur', label: 'Blur', icon: getLucideSvg('eye-off', { size: 12 }) },
     ];
 
     toolbar.innerHTML = `
       <div id="letme-tools-container" style="display: flex; gap: 4px; flex-wrap: wrap;"></div>
       <div style="margin-left: auto; display: flex; gap: 4px;">
-        <button id="letme-btn-undo" title="Undo" style="background: #27272a; border: none; color: #fafafa; padding: 4px 6px; border-radius: 4px; cursor: pointer; font-size: 11px;">↩️</button>
-        <button id="letme-btn-clear-markup" title="Clear All" style="background: #27272a; border: none; color: #fafafa; padding: 4px 6px; border-radius: 4px; cursor: pointer; font-size: 11px;">🧹</button>
+        <button id="letme-btn-undo" title="Undo" style="background: #27272a; border: none; color: #fafafa; padding: 4px 6px; border-radius: 4px; cursor: pointer; display: flex; align-items: center; justify-content: center;">${getLucideSvg('undo-2', { size: 12 })}</button>
+        <button id="letme-btn-clear-markup" title="Clear All" style="background: #27272a; border: none; color: #fafafa; padding: 4px 6px; border-radius: 4px; cursor: pointer; display: flex; align-items: center; justify-content: center;">${getLucideSvg('trash-2', { size: 12 })}</button>
       </div>
     `;
 
@@ -158,7 +179,10 @@ export class OverlayUi {
     tools.forEach((t) => {
       const btn = document.createElement('button');
       btn.dataset.tool = t.id;
-      btn.innerHTML = `${t.icon} ${t.label}`;
+      btn.innerHTML = `${t.icon} <span>${t.label}</span>`;
+      btn.style.display = 'inline-flex';
+      btn.style.alignItems = 'center';
+      btn.style.gap = '5px';
       btn.style.padding = '4px 7px';
       btn.style.fontSize = '11px';
       btn.style.border = '1px solid #27272a';
@@ -220,9 +244,11 @@ export class OverlayUi {
 
     footer.innerHTML = `
       <button id="letme-btn-cancel" style="padding: 6px 12px; background: #18181b; border: 1px solid #27272a; border-radius: 6px; color: #a1a1aa; font-weight: 500; font-size: 11px; cursor: pointer;">Cancel</button>
-      <button id="letme-btn-copy-prompt" style="padding: 6px 12px; background: #27272a; border: 1px solid #3f3f46; border-radius: 6px; color: #fafafa; font-weight: 500; font-size: 11px; cursor: pointer;">📋 Copy Prompt</button>
-      <button id="letme-btn-send" style="padding: 6px 14px; background: #fafafa; border: none; border-radius: 6px; color: #09090b; font-weight: 600; font-size: 12px; cursor: pointer; display: flex; align-items: center; gap: 4px;">
-        <span>🚀 Send to AI</span>
+      <button id="letme-btn-copy-prompt" style="padding: 6px 12px; background: #27272a; border: 1px solid #3f3f46; border-radius: 6px; color: #fafafa; font-weight: 500; font-size: 11px; cursor: pointer; display: inline-flex; align-items: center; gap: 5px;">
+        ${getLucideSvg('copy', { size: 12 })} <span>Copy Prompt</span>
+      </button>
+      <button id="letme-btn-send" style="padding: 6px 14px; background: #fafafa; border: none; border-radius: 6px; color: #09090b; font-weight: 600; font-size: 12px; cursor: pointer; display: inline-flex; align-items: center; gap: 5px;">
+        ${getLucideSvg('zap', { size: 13, color: '#09090b' })} <span>Send to AI</span>
       </button>
     `;
     this.container.appendChild(footer);
@@ -238,9 +264,9 @@ export class OverlayUi {
     this.container.querySelector('#letme-btn-copy-prompt')?.addEventListener('click', () => {
       const instructions = (this.container?.querySelector('#letme-input-instructions') as HTMLTextAreaElement)?.value || '';
       const bugNotes = (this.container?.querySelector('#letme-input-bugs') as HTMLTextAreaElement)?.value || '';
-      const promptText = `### 🎯 Element: <${element.tagName.toLowerCase()}> \`${selector}\`\n- **Size**: ${boxModel.width}x${boxModel.height}px\n- **Instructions**: ${instructions || 'N/A'}\n- **Bugs**: ${bugNotes || 'N/A'}`;
+      const promptText = `### Element: <${element.tagName.toLowerCase()}> \`${selector}\`\n- **Size**: ${boxModel.width}x${boxModel.height}px\n- **Instructions**: ${instructions || 'N/A'}\n- **Bugs**: ${bugNotes || 'N/A'}`;
       navigator.clipboard.writeText(promptText);
-      this.showToast('📋 Prompt copied to clipboard!');
+      this.showToast('Prompt copied to clipboard!');
     });
 
     this.container.querySelector('#letme-btn-send')?.addEventListener('click', () => {
@@ -280,6 +306,14 @@ export class OverlayUi {
   }
 
   remove() {
+    if (this.statusInterval) {
+      clearInterval(this.statusInterval);
+      this.statusInterval = null;
+    }
+    if (this.statusListener) {
+      chrome.runtime.onMessage.removeListener(this.statusListener);
+      this.statusListener = null;
+    }
     if (this.container) {
       this.container.remove();
       this.container = null;

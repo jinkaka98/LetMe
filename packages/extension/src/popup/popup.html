@@ -26,7 +26,9 @@
           <span class="status-dot"></span>
           <span id="mcp-status-text">MCP</span>
         </div>
-        <button id="btn-tab-settings" class="icon-btn" title="Settings">⚙️</button>
+        <button id="btn-tab-settings" class="icon-btn" title="Settings">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+        </button>
       </div>
     </header>
 
@@ -41,7 +43,9 @@
             <span class="card-badge">Manual</span>
           </div>
           <button id="btn-start-inspect" class="btn-primary">
-            <span class="btn-icon">🎯</span>
+            <span class="btn-icon">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="22" x2="18" y1="12" y2="12"/><line x1="6" x2="2" y1="12" y2="12"/><line x1="12" x2="12" y1="2" y2="6"/><line x1="12" x2="12" y1="18" y2="22"/></svg>
+            </span>
             <span id="label-start-inspect">Start Element Inspector</span>
           </button>
         </section>
@@ -53,7 +57,10 @@
             <span class="card-badge">Diagnostic</span>
           </div>
           <button id="btn-multi-pick" class="btn-secondary btn-full">
-            <span class="btn-icon">👆</span> Pick Elements & Staging
+            <span class="btn-icon">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 9 5 12 1.8-5.2L21 14Z"/><path d="M7.2 2.2 8 5.1"/><path d="m5.1 8-2.9-.8"/><path d="M14 4.1 12 6"/><path d="m6 12-1.9 2"/></svg>
+            </span>
+            <span>Pick Elements & Staging</span>
           </button>
         </section>
 
@@ -64,10 +71,16 @@
           </div>
           <div class="btn-group">
             <button id="btn-shot-area" class="btn-secondary">
-              <span class="btn-icon">✂️</span> Area Crop
+              <span class="btn-icon">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 2v14a2 2 0 0 0 2 2h14"/><path d="M18 22V8a2 2 0 0 0-2-2H2"/></svg>
+              </span>
+              <span>Area Crop</span>
             </button>
             <button id="btn-shot-full" class="btn-secondary">
-              <span class="btn-icon">🖼️</span> Full Viewport
+              <span class="btn-icon">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3H5a2 2 0 0 0-2 2v3"/><path d="M21 8V5a2 2 0 0 0-2-2h-3"/><path d="M3 16v3a2 2 0 0 0 2 2h3"/><path d="M16 21h3a2 2 0 0 0 2-2v-3"/></svg>
+              </span>
+              <span>Full Viewport</span>
             </button>
           </div>
         </section>
@@ -79,9 +92,12 @@
             <span id="badge-ai-provider" class="card-badge">AI Vision</span>
           </div>
           <button id="btn-auto-bug" class="btn-secondary btn-full">
-            <span class="btn-icon">🤖</span> Scan Page with AI Vision
+            <span class="btn-icon">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 8V4H8"/><rect width="16" height="12" x="4" y="8" rx="2"/><path d="M2 14h2"/><path d="M20 14h2"/><path d="M15 13v2"/><path d="M9 13v2"/></svg>
+            </span>
+            <span>Scan Page with AI Vision</span>
           </button>
-          <div id="ai-provider-info" class="card-footnote">Config: OpenRouter / Gemini in Settings ⚙️</div>
+          <div id="ai-provider-info" class="card-footnote">Config: OpenRouter / Gemini in Settings</div>
         </section>
       </div>
 
@@ -89,7 +105,10 @@
       <div id="view-settings" class="view">
         <div class="settings-header">
           <span class="settings-title">AI Vision API Settings</span>
-          <button id="btn-back-actions" class="link-btn">← Back</button>
+          <button id="btn-back-actions" class="link-btn">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m12 19-7-7 7-7"/><path d="M19 12H5"/></svg>
+            <span>Back</span>
+          </button>
         </div>
 
         <form id="form-settings" class="settings-form">
@@ -121,14 +140,15 @@
             <div style="display: flex; justify-content: space-between; align-items: center;">
               <label for="input-model">Vision Model:</label>
               <button type="button" id="btn-fetch-models" class="fetch-btn" title="Auto-detect models from provider">
-                🔄 Load Models
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/><path d="M8 16H3v5"/></svg>
+                <span>Load Models</span>
               </button>
             </div>
             <div class="model-input-wrap">
               <select id="select-model" class="select-field" style="display: none;"></select>
               <input type="text" id="input-model" placeholder="e.g. gpt-4o-mini" />
             </div>
-            <span id="model-fetch-status" class="field-hint">Auto-detect with 🔄 or type manually</span>
+            <span id="model-fetch-status" class="field-hint">Auto-detect with button above or type manually</span>
           </div>
 
           <button type="submit" class="btn-primary">

@@ -354,10 +354,10 @@ export class MarkupStudio {
 
       ctx.setLineDash([]);
       ctx.fillStyle = ann.color || '#ef4444';
-      ctx.fillRect(x, Math.max(0, y - 22), 70, 22);
+      ctx.fillRect(x, Math.max(0, y - 22), 52, 22);
       ctx.fillStyle = '#ffffff';
       ctx.font = 'bold 12px sans-serif';
-      ctx.fillText('BUG ⚠️', x + 6, Math.max(0, y - 22) + 15);
+      ctx.fillText('BUG', x + 10, Math.max(0, y - 22) + 15);
     } else if (ann.type === 'ruler' && ann.startPoint && ann.endPoint) {
       this.drawRuler(ann.startPoint, ann.endPoint, ann.text || '');
     } else if (ann.type === 'text' && ann.startPoint && ann.text) {
@@ -395,7 +395,7 @@ export class MarkupStudio {
       ctx.fillRect(x, y, w, h);
       ctx.fillStyle = '#71717a';
       ctx.font = 'italic 11px sans-serif';
-      ctx.fillText('🔒 CENSORED', x + 6, y + h / 2 + 4);
+      ctx.fillText('[CENSORED]', x + 6, y + h / 2 + 4);
     }
 
     ctx.restore();
