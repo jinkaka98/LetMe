@@ -14,6 +14,8 @@
     "dev:server": "npm run dev --workspace=@letme/mcp-server",
     "dev:extension": "npm run dev --workspace=@letme/extension",
     "start:server": "node packages/mcp-server/dist/index.js",
+    "package:extension": "node packages/extension/scripts/packageRelease.js",
+    "release": "npm run build && npm run package:extension",
     "test": "npm run test --workspaces --if-present"
   },
   "keywords": [

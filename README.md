@@ -140,14 +140,24 @@ npm run build
 This compiles all packages (`@letme/shared`, `@letme/mcp-server`, and `@letme/extension`).
 
 ### Chrome Extension Installation
+
+#### Method 1: Download Pre-built Release (Fastest)
+1. Download **`letme-extension-v0.1.0.zip`** from [GitHub Releases](https://github.com/jinkaka98/LetMe/releases).
+2. Extract the `.zip` archive to a folder on your computer.
+3. Open Google Chrome and navigate to `chrome://extensions/`.
+4. Enable **Developer mode** in the top-right corner.
+5. Click **Load unpacked** and select the unzipped folder.
+6. Pin the **LetMe** extension icon in your Chrome toolbar.
+
+#### Method 2: Load from Local Build
+If you cloned and built the repository:
 1. Open Google Chrome and navigate to `chrome://extensions/`.
-2. Toggle on **Developer mode** in the top-right corner.
-3. Click **Load unpacked**.
-4. Select the build output directory:
+2. Enable **Developer mode**.
+3. Click **Load unpacked** and select:
    ```
    <PATH_TO_LETME>/packages/extension/dist
    ```
-5. Pin the **LetMe** extension icon in your Chrome toolbar.
+*(You can also generate a portable zip anytime by running `npm run package:extension`)*.
 
 ---
 

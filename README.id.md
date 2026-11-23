@@ -140,14 +140,24 @@ npm run build
 Perintah di atas akan mengompilasi seluruh paket (`@letme/shared`, `@letme/mcp-server`, dan `@letme/extension`).
 
 ### Memasang Ekstensi di Google Chrome
-1. Buka Chrome dan akses alamat `chrome://extensions/`.
-2. Aktifkan sakelar **Developer mode** di pojok kanan atas.
-3. Klik tombol **Load unpacked**.
-4. Pilih folder hasil kompilasi ekstensi:
+
+#### Metode 1: Unduh Rilis Siap Pakai (Tercepat)
+1. Unduh file **`letme-extension-v0.1.0.zip`** dari halaman [GitHub Releases](https://github.com/jinkaka98/LetMe/releases).
+2. Ekstrak file zip tersebut ke salah satu folder di komputer Anda.
+3. Buka Google Chrome dan buka `chrome://extensions/`.
+4. Aktifkan sakelar **Developer mode** di pojok kanan atas.
+5. Klik **Load unpacked** lalu pilih folder hasil ekstrak tadi.
+6. Sematkan (*pin*) ikon ekstensi **LetMe** di toolbar browser Anda.
+
+#### Metode 2: Pasang dari Kompilasi Lokal (Source Code)
+Jika Anda mengkloning dan mengompilasi dari sumber:
+1. Buka Google Chrome dan buka `chrome://extensions/`.
+2. Aktifkan **Developer mode**.
+3. Klik **Load unpacked** dan pilih direktori:
    ```
    <PATH_TO_LETME>/packages/extension/dist
    ```
-5. Sematkan (*pin*) ikon ekstensi **LetMe** di toolbar browser Anda.
+*(Anda juga dapat membuat file zip portabel kapan saja dengan menjalankan `npm run package:extension`)*.
 
 ---
 
