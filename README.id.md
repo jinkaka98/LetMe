@@ -105,14 +105,33 @@ flowchart LR
 
 ## Panduan Cepat
 
-### Prasyarat
-- **Node.js**: `v18.0.0` atau lebih baru
-- **npm**: `v9.0.0` atau lebih baru
-- **Browser**: Google Chrome atau browser berbasis Chromium (Brave, Edge, Arc)
+### Pilihan Instalasi & Eksekusi
 
-### 1. Kloning & Bangun Proyek
+Anda dapat menjalankan LetMe MCP Bridge secara instan menggunakan `npx` atau mengkloning repositori untuk membangun ekstensi Chrome dan server secara lokal dari source code.
+
+#### Pilihan A: Peluncuran Cepat via NPX (Tanpa Kloning)
+Konfigurasikan klien AI Anda (Cursor, Claude, Antigravity) untuk langsung menjalankan server via `npx`:
+
+```json
+{
+  "mcpServers": {
+    "letme": {
+      "command": "npx",
+      "args": ["-y", "@letme/mcp-server"]
+    }
+  }
+}
+```
+
+Atau pasang secara global di komputer Anda:
 ```bash
-git clone https://github.com/your-username/LetMe.git
+npm install -g @letme/mcp-server
+letme-mcp
+```
+
+#### Pilihan B: Kloning & Bangun dari Source (Ekstensi Penuh + Server)
+```bash
+git clone https://github.com/jinkaka98/LetMe.git
 cd LetMe
 npm install
 npm run build
@@ -120,7 +139,7 @@ npm run build
 
 Perintah di atas akan mengompilasi seluruh paket (`@letme/shared`, `@letme/mcp-server`, dan `@letme/extension`).
 
-### 2. Pasang Ekstensi di Google Chrome
+### Memasang Ekstensi di Google Chrome
 1. Buka Chrome dan akses alamat `chrome://extensions/`.
 2. Aktifkan sakelar **Developer mode** di pojok kanan atas.
 3. Klik tombol **Load unpacked**.
@@ -337,7 +356,8 @@ Kontribusi dari komunitas sangat dinantikan! Silakan ikuti panduan berikut sebel
 
 ---
 
-## Lisensi
+## Lisensi & Pembuat
 
-Proyek ini dilisensikan di bawah [Lisensi MIT](LICENSE).
-Perangkat lunak open-source yang dirancang untuk pengembang dan asisten AI.
+Proyek ini dilisensikan di bawah [Lisensi MIT](https://github.com/jinkaka98/LetMe/blob/main/LICENSE). Perangkat lunak open-source yang dirancang untuk pengembang dan asisten AI.
+
+Dibuat dan dipelihara oleh **G assad S Eks Xixero1445** ([@jinkaka98](https://github.com/jinkaka98)). Kontribusi, masukan, dan kolaborasi sangat terbuka!

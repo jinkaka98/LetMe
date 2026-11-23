@@ -7,6 +7,10 @@
   },
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
+  "files": [
+    "dist",
+    "bin"
+  ],
   "type": "module",
   "scripts": {
     "build": "tsc",
@@ -14,6 +18,12 @@
     "start": "node dist/index.js",
     "dev": "tsc && node dist/index.js",
     "test": "node --test --experimental-strip-types test/mcpServer.test.ts"
+  },
+  "author": "G assad S Eks Xixero1445 (https://github.com/jinkaka98)",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/jinkaka98/LetMe.git"
   },
   "dependencies": {
     "@letme/shared": "*",

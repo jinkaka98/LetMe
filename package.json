@@ -26,6 +26,10 @@
     "inspector",
     "wireframe"
   ],
-  "author": "",
+  "author": "G assad S Eks Xixero1445 (https://github.com/jinkaka98)",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/jinkaka98/LetMe.git"
+  },
   "license": "MIT"
 }

@@ -4,6 +4,9 @@
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
+  "files": [
+    "dist"
+  ],
   "exports": {
     ".": {
       "import": "./dist/index.js",
@@ -13,6 +16,12 @@
   "scripts": {
     "build": "tsc",
     "watch": "tsc -w"
+  },
+  "author": "G assad S Eks Xixero1445 (https://github.com/jinkaka98)",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/jinkaka98/LetMe.git"
   },
   "devDependencies": {
     "typescript": "^5.7.0"

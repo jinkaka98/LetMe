@@ -8,6 +8,12 @@
     "dev": "vite build --watch",
     "build": "tsc && vite build"
   },
+  "author": "G assad S Eks Xixero1445 (https://github.com/jinkaka98)",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/jinkaka98/LetMe.git"
+  },
   "dependencies": {
     "@letme/shared": "*"
   },

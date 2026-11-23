@@ -105,14 +105,33 @@ flowchart LR
 
 ## Quick Start
 
-### Prerequisites
-- **Node.js**: `v18.0.0` or higher
-- **npm**: `v9.0.0` or higher
-- **Browser**: Google Chrome or any Chromium-based browser (Brave, Edge, Arc)
+### Installation & Execution
 
-### 1. Clone & Build
+You can run LetMe's MCP Bridge directly via `npx` (fastest) or clone the repository to build the full monorepo and Chrome Extension from source.
+
+#### Option A: Quick Launch via NPX (Zero Setup)
+Configure your AI client (Cursor, Claude, Antigravity) to spawn the server directly via `npx`:
+
+```json
+{
+  "mcpServers": {
+    "letme": {
+      "command": "npx",
+      "args": ["-y", "@letme/mcp-server"]
+    }
+  }
+}
+```
+
+Or install it globally to your system:
 ```bash
-git clone https://github.com/your-username/LetMe.git
+npm install -g @letme/mcp-server
+letme-mcp
+```
+
+#### Option B: Clone & Build from Source (Full Extension + MCP Bridge)
+```bash
+git clone https://github.com/jinkaka98/LetMe.git
 cd LetMe
 npm install
 npm run build
@@ -120,8 +139,8 @@ npm run build
 
 This compiles all packages (`@letme/shared`, `@letme/mcp-server`, and `@letme/extension`).
 
-### 2. Install Chrome Extension
-1. Open Chrome and navigate to `chrome://extensions/`.
+### Chrome Extension Installation
+1. Open Google Chrome and navigate to `chrome://extensions/`.
 2. Toggle on **Developer mode** in the top-right corner.
 3. Click **Load unpacked**.
 4. Select the build output directory:
@@ -337,7 +356,8 @@ Contributions are warmly welcomed! Please read our guidelines before submitting 
 
 ---
 
-## License
+## License & Author
 
-This project is licensed under the [MIT License](LICENSE).
-Open-source software designed for developers and AI agents alike.
+This project is licensed under the [MIT License](https://github.com/jinkaka98/LetMe/blob/main/LICENSE). Open-source software designed for developers and AI agents alike.
+
+Authored and maintained with precision by **G assad S Eks Xixero1445** ([@jinkaka98](https://github.com/jinkaka98)). Contributions, issues, and discussions are welcome!
