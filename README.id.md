@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="packages/extension/public/icons/logo.svg" alt="Logo LetMe" width="100" height="100" />
+  <img src="packages/extension/public/icons/logo.png" alt="Logo LetMe" width="100" height="100" />
 </p>
 
 <h1 align="center">LetMe</h1>
@@ -34,38 +34,27 @@ Dengan LetMe, Anda dapat menginspeksi elemen DOM, menggambar anotasi visual pada
 
 ## Fitur Utama
 
-### 1. Precision Element Inspector
-- **Telemetri Box Model Lengkap**: Mengukur dimensi konten, padding, border, dan margin hingga tingkat sub-piksel presisi.
-- **Ekstraksi Computed Styles**: Mengekstrak aturan tata letak penting (`display`, `position`, `flex`, `grid`, `z-index`, `overflow`) secara bersih tanpa informasi berlebih.
-- **Pembuatan Selector DOM Otomatis**: Menghasilkan CSS selector unik (`div.card > span#title`) dan cuplikan outerHTML yang ringkas.
-- **Diagnostik Layout Otomatis**: Mendeteksi secara instan pemotongan oleh elemen induk (*ancestor clipping*), tabrakan *z-index*, dan kebocoran horizontal scrollbar.
+### 1. Precision Element Inspector & Floating Studio HUD
+- **Floating HUD (Excalidraw × Photoshop)**: Toolbar melayang di tengah atas, **Layers Panel** dengan thumbnail preview tiap elemen yang di-pick, dan **Properties Modal** di sebelah kanan yang terisolasi penuh dengan Shadow DOM.
+- **Blueprint Selection & Multi-Layer Tagging**: Pick banyak elemen sekaligus dengan *corner handles* ala CAD/Figma, callout dimensi, tag kategori (`Bug`, `Design`, `Edit`, `Note`), catatan per-layer, dan **Raw Payload Preview**.
+- **Diagnostik Box Model & Layout Otomatis**: Mengukur sub-piksel box model, selector CSS deterministik, cuplikan outerHTML, serta mendeteksi *ancestor clipping*, tabrakan *z-index*, dan kebocoran horizontal scroll.
 
-### 2. Canvas Markup Studio
-- **Anotasi Vektor Overlay**: Menggambar panah, kotak pembatas, penggaris pengukur piksel, catatan teks yang dapat digeser (*draggable*), dan kotak sensor blur langsung di atas halaman web.
-- **Kanvas Non-Destruktif**: Seluruh coretan dirender pada lapisan kanvas transparan tanpa mengubah struktur DOM atau styling halaman web asli.
+### 2. Canvas Markup Studio (Transform & Anotasi Lengkap)
+- **Alat Vektor Lengkap**: Gambar 6 bentuk (*Box, Rounded Box, Circle, Diamond, Triangle, Pill*), panah, garis alignment, penggaris piksel, pena bebas, **inline text langsung di kanvas** (*Montserrat, Poppins, Calibri, Arial, 4-Bit*), dan **pixelated Censored blur** dengan ikon.
+- **8-Handle Resize, Rotate & Eraser**: Gunakan **Hand (`H`)** untuk menggeser, resize 8 sisi, atau memutar (*rotate*) objek apa pun; gunakan **Eraser (`E`)** untuk hapus per-objek dengan sekali klik; pilih warna bebas lewat **Color Picker lingkaran + input Hex** dan atur ketebalan **`▲/▼` px**.
+- **Anotasi Terikat per-Layer**: Coretan tersimpan terpisah di masing-masing layer agar tidak bercampur saat berpindah elemen.
 
-### 3. AI Vision Auto Bug Hunter
-- **Audit Otomatis Multimodal**: Memanfaatkan model Vision LLM (misalnya Google Gemini 2.0 Flash, Claude 3.5 Sonnet, atau GPT-4o via OpenRouter, Groq, atau Ollama) untuk mendeteksi cacat visual, misalignment, dan teks terpotong secara mandiri.
-- **Contextual DOM Text Snapping**: Menghubungkan temuan visual AI langsung ke elemen DOM nyata yang bersangkutan berdasarkan teks target.
-- **Sinkronisasi Scroll 60 FPS**: Menggunakan `requestAnimationFrame` berkinerja tinggi sehingga pin dan kotak pembatas tetap menempel presisi saat halaman digulir cepat.
-- **Drawer Slide-over Interaktif**: Meninjau bug berdasarkan tingkat keparahan (*critical*, *warning*, *suggestion*), memfilter isu, dan mengklik kartu untuk melakukan *smooth-scroll* langsung ke elemen yang bermasalah.
+### 3. Monochrome Blueprint Popup, Dynamic Island & Custom Shortcuts
+- **Tema Monochrome Black & White Blueprint**: Antarmuka popup bergrid teknis hitam-putih dengan grup **Pick & audit** (`Pick Audit` + `Pick with AI`) dan **Dynamic Island** untuk memilih mode `Screenshot` (`Area Crop` / `Full Viewport`).
+- **Custom Multi-Key Shortcuts**: Atur shortcut untuk ke-4 tombol utama langsung di `Settings → Shortcuts` (mendukung kombinasi modifier seperti `Alt+Shift+I` maupun *multi-press chord* seperti `I+O+U`).
 
-### 4. Multi-Element Stager
-- **Penangkapan Komponen Masif**: Memilih beberapa elemen UI di berbagai section atau halaman dalam satu sesi kerja.
-- **Catatan Pengembang per Elemen**: Menambahkan instruksi atau laporan bug khusus pada masing-masing komponen yang distage.
-- **Pengiriman Terkonsolidasi**: Menghasilkan prompt terstruktur otomatis lengkap dengan kode laporan unik (`[LETME MULTI-ELEMENT STAGE: LTM-...]`) yang langsung tersalin ke clipboard.
+### 4. Right MCP Storage Sidebar & Bidirectional Live CSS Preview
+- **MCP Storage Inspector**: Panel kanan full-height (`MCP (N)`) yang bisa di-Show/Hide untuk melihat daftar snapshot yang sudah terbaca di MCP Server dan menghapus item yang salah kirim.
+- **Live CSS Preview Tanpa Reload**: Coding agent dapat memanggil `letme_apply_css_preview` dan `letme_clear_preview` untuk menguji perbaikan CSS langsung di browser aktif.
 
-### 5. Interactive Area Crop & Viewport Studio
-- **Seleksi Crosshair**: Menarik area seleksi persegi panjang atau mengambil tangkapan layar penuh viewport.
-- **Integrasi Clipboard Instan**: Otomatis menyalin gambar hasil crop ke sistem clipboard sekaligus menyinkronkannya ke MCP server.
-
-### 6. Bidirectional Live CSS Preview
-- **Pengujian Gaya Tanpa Reload**: Coding agent dapat memanggil tool MCP `letme_apply_css_preview` untuk langsung menguji perbaikan CSS pada tab browser Anda secara instan.
-- **Reversi Seketika**: Satu klik tombol atau tool `letme_clear_preview` untuk mengembalikan styling ke kondisi awal setelah selesai ditinjau.
-
-### 7. Desain Monokrom Minimalis
-- **Anti AI-Slop**: Dibangun dengan antarmuka kontras tinggi bertema hitam-putih terinspirasi dari standar desain Linear dan Vercel.
-- **Official Lucide SVG Icons**: 100% menggunakan ikon vektor SVG resmi Lucide untuk ketajaman visual maksimal di layar Retina dan resolusi tinggi.
+### 5. AI Vision Auto Bug Hunter & Area Screenshot Studio
+- **Audit Otomatis Multimodal**: Memanfaatkan Vision LLM (Gemini, OpenRouter, OpenAI, Groq, Ollama) dengan pin 60 FPS dan filter tingkat keparahan.
+- **Area Crop & Full Viewport**: Seleksi crosshair atau tangkapan layar penuh dengan sinkronisasi clipboard instan.
 
 ---
 

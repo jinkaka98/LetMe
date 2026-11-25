@@ -63,14 +63,38 @@ export interface MarkupPoint {
 
 export interface MarkupAnnotation {
   id: string;
-  type: 'pen' | 'arrow' | 'box' | 'text' | 'ruler' | 'blur';
+  type:
+    | 'pen'
+    | 'arrow'
+    | 'box'
+    | 'rounded-box'
+    | 'circle'
+    | 'diamond'
+    | 'triangle'
+    | 'callout'
+    | 'line'
+    | 'text'
+    | 'ruler'
+    | 'blur';
   color?: string;
   strokeWidth?: number;
   points?: MarkupPoint[]; // For pen
   startPoint?: MarkupPoint; // For arrow, box, ruler, blur
   endPoint?: MarkupPoint;
   text?: string; // For text annotation or ruler distance label
+  fontFamily?: string; // For text annotation
   blurArea?: { x: number; y: number; width: number; height: number };
+  rotation?: number; // Radians
+}
+
+export interface McpSnapshotSummary {
+  id: string;
+  timestamp: number;
+  tagName: string;
+  selector: string;
+  url: string;
+  userInstructions?: string;
+  userBugNotes?: string;
 }
 
 export interface ConsoleLogEntry {
@@ -120,3 +144,25 @@ export interface LivePreviewResult {
   selector: string;
   message?: string;
 }
+
+export type ShortcutActionId =
+  | 'inspect'
+  | 'pickAudit'
+  | 'pickAi'
+  | 'screenshot';
+
+export interface CustomShortcutsConfig {
+  inspect: string;
+  pickAudit: string;
+  pickAi: string;
+  screenshot: string;
+  screenshotMode: 'area' | 'full';
+}
+
+export const DEFAULT_CUSTOM_SHORTCUTS: CustomShortcutsConfig = {
+  inspect: 'Alt+Shift+I',
+  pickAudit: 'Alt+Shift+P',
+  pickAi: 'Alt+Shift+A',
+  screenshot: 'Alt+Shift+S',
+  screenshotMode: 'area',
+};

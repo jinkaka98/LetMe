@@ -44,6 +44,16 @@ export class StateStore {
     this.activeElement = null;
   }
 
+  deleteSnapshot(id: string): boolean {
+    const idx = this.snapshots.findIndex((s) => s.id === id);
+    if (idx === -1) return false;
+    this.snapshots.splice(idx, 1);
+    if (this.activeElement?.id === id) {
+      this.activeElement = this.snapshots[0] || null;
+    }
+    return true;
+  }
+
   addConsoleLogs(logs: ConsoleLogEntry[]) {
     this.consoleLogs.push(...logs);
     if (this.consoleLogs.length > 100) {

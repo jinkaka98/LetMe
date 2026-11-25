@@ -3,7 +3,36 @@ import {
   ClientMessage,
   ServerMessage,
   LivePreviewResult,
+  McpSnapshotSummary,
+  ElementSnapshot,
 } from '@letme/shared';
+
+let localSnapshots: McpSnapshotSummary[] = [];
+
+function broadcastSnapshotsToTabs() {
+  chrome.tabs.query({}).then((tabs) => {
+    tabs.forEach((tab) => {
+      if (tab.id) {
+        chrome.tabs.sendMessage(tab.id, {
+          type: 'MCP_SNAPSHOTS_UPDATED',
+          snapshots: localSnapshots,
+        }).catch(() => {});
+      }
+    });
+  }).catch(() => {});
+}
+
+function toSnapshotSummary(s: ElementSnapshot): McpSnapshotSummary {
+  return {
+    id: s.id,
+    timestamp: s.timestamp,
+    tagName: s.tagName,
+    selector: s.selector,
+    url: s.url,
+    userInstructions: s.userInstructions,
+    userBugNotes: s.userBugNotes,
+  };
+}
 
 class ExtensionBridgeService {
   private ws: WebSocket | null = null;
@@ -206,6 +235,12 @@ class ExtensionBridgeService {
         chrome.tabs.sendMessage(activeTab.id, msg);
         break;
       }
+
+      case 'SNAPSHOTS_LIST': {
+        localSnapshots = msg.payload.snapshots || [];
+        broadcastSnapshotsToTabs();
+        break;
+      }
     }
   }
 }
@@ -234,12 +269,16 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
   }
 
   if (message.type === 'ELEMENT_CAPTURED') {
+    const summary = toSnapshotSummary(message.payload);
+    localSnapshots = [summary, ...localSnapshots.filter((s) => s.id !== summary.id)].slice(0, 20);
+    broadcastSnapshotsToTabs();
+
     bridgeService.send({
       type: 'ELEMENT_CAPTURED',
       payload: message.payload,
       timestamp: Date.now(),
     });
-    sendResponse({ success: true });
+    sendResponse({ success: true, snapshots: localSnapshots });
     return false;
   }
 
@@ -249,6 +288,33 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
       payload: message.payload,
       timestamp: Date.now(),
     });
+    return false;
+  }
+
+  if (message.type === 'GET_MCP_SNAPSHOTS') {
+    if (bridgeService.getIsConnected()) {
+      bridgeService.send({
+        type: 'LIST_SNAPSHOTS',
+        payload: {},
+        timestamp: Date.now(),
+      });
+    }
+    sendResponse({ success: true, snapshots: localSnapshots });
+    return false;
+  }
+
+  if (message.type === 'DELETE_MCP_SNAPSHOT') {
+    const targetId = message.payload?.id;
+    if (targetId) {
+      localSnapshots = localSnapshots.filter((s) => s.id !== targetId);
+      broadcastSnapshotsToTabs();
+      bridgeService.send({
+        type: 'DELETE_SNAPSHOT',
+        payload: { id: targetId },
+        timestamp: Date.now(),
+      });
+    }
+    sendResponse({ success: true, snapshots: localSnapshots });
     return false;
   }
 

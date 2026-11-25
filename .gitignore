@@ -6,3 +6,4 @@ build/
 *.log
 .env
 .env.local
+release/letme-extension-v0.1.0/

@@ -80,6 +80,20 @@ export class WsBridge {
         console.error(
           `[LetMe WS Bridge] Element captured from page: <${msg.payload.tagName}> ${msg.payload.selector}`
         );
+        this.broadcastSnapshotsList();
+        break;
+
+      case 'LIST_SNAPSHOTS':
+        this.sendToClient(ws, {
+          type: 'SNAPSHOTS_LIST',
+          payload: { snapshots: this.getSnapshotSummaries() },
+          timestamp: Date.now(),
+        });
+        break;
+
+      case 'DELETE_SNAPSHOT':
+        globalStore.deleteSnapshot(msg.payload.id);
+        this.broadcastSnapshotsList();
         break;
 
       case 'LIVE_PREVIEW_APPLIED':
@@ -110,6 +124,26 @@ export class WsBridge {
         client.send(raw);
       }
     }
+  }
+
+  private getSnapshotSummaries() {
+    return globalStore.getSnapshots().map((s) => ({
+      id: s.id,
+      timestamp: s.timestamp,
+      tagName: s.tagName,
+      selector: s.selector,
+      url: s.url,
+      userInstructions: s.userInstructions,
+      userBugNotes: s.userBugNotes,
+    }));
+  }
+
+  private broadcastSnapshotsList() {
+    this.broadcast({
+      type: 'SNAPSHOTS_LIST',
+      payload: { snapshots: this.getSnapshotSummaries() },
+      timestamp: Date.now(),
+    });
   }
 
   private sendToClient(ws: WebSocket, message: ServerMessage) {

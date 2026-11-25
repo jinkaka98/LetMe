@@ -3,9 +3,118 @@ import { livePreviewManager } from './livePreview.js';
 import { screenshotTool } from './screenshotTool.js';
 import { multiPicker } from './multiPicker.js';
 import { autoBugDetector } from './autoBugDetector.js';
-import { ConsoleLogEntry } from '@letme/shared';
+import {
+  ConsoleLogEntry,
+  CustomShortcutsConfig,
+  DEFAULT_CUSTOM_SHORTCUTS,
+} from '@letme/shared';
+import {
+  formatChordFromSet,
+  mergeShortcutsConfig,
+  normalizeKeyToken,
+  SHORTCUTS_STORAGE_KEY,
+} from '../shortcuts.js';
 
 console.log('[LetMe v2] Content script initialized on:', window.location.href);
+
+let activeShortcuts: CustomShortcutsConfig = { ...DEFAULT_CUSTOM_SHORTCUTS };
+
+chrome.storage.local.get(SHORTCUTS_STORAGE_KEY).then((data) => {
+  activeShortcuts = mergeShortcutsConfig(data[SHORTCUTS_STORAGE_KEY]);
+});
+
+chrome.storage.onChanged.addListener((changes, areaName) => {
+  if (areaName === 'local' && changes[SHORTCUTS_STORAGE_KEY]) {
+    activeShortcuts = mergeShortcutsConfig(changes[SHORTCUTS_STORAGE_KEY].newValue);
+  }
+});
+
+const pressedKeys = new Set<string>();
+let lastTriggeredChord = '';
+
+window.addEventListener('blur', () => {
+  pressedKeys.clear();
+  lastTriggeredChord = '';
+});
+
+window.addEventListener(
+  'keyup',
+  (e: KeyboardEvent) => {
+    const token = normalizeKeyToken(e);
+    if (token) {
+      pressedKeys.delete(token);
+    }
+    if (pressedKeys.size === 0) {
+      lastTriggeredChord = '';
+    }
+  },
+  true
+);
+
+window.addEventListener(
+  'keydown',
+  (e: KeyboardEvent) => {
+    const target = e.target as HTMLElement | null;
+    const isEditable =
+      !!target &&
+      (target.tagName === 'INPUT' ||
+        target.tagName === 'TEXTAREA' ||
+        target.tagName === 'SELECT' ||
+        target.isContentEditable);
+
+    if (isEditable && !e.altKey && !e.ctrlKey && !e.metaKey) {
+      return;
+    }
+
+    if (e.repeat) return;
+
+    // Sync modifier state to prevent stuck modifiers after focus/alt-tab
+    if (!e.ctrlKey) pressedKeys.delete('Ctrl');
+    if (!e.altKey) pressedKeys.delete('Alt');
+    if (!e.shiftKey) pressedKeys.delete('Shift');
+    if (!e.metaKey) pressedKeys.delete('Meta');
+
+    const token = normalizeKeyToken(e);
+    if (!token) return;
+    pressedKeys.add(token);
+
+    const combo = formatChordFromSet(pressedKeys);
+    if (!combo || combo === lastTriggeredChord) return;
+
+    if (combo === activeShortcuts.inspect) {
+      lastTriggeredChord = combo;
+      e.preventDefault();
+      e.stopPropagation();
+      multiPicker.stop();
+      elementInspector.toggle();
+    } else if (combo === activeShortcuts.pickAudit) {
+      lastTriggeredChord = combo;
+      e.preventDefault();
+      e.stopPropagation();
+      elementInspector.stop();
+      multiPicker.toggle();
+    } else if (combo === activeShortcuts.pickAi) {
+      lastTriggeredChord = combo;
+      e.preventDefault();
+      e.stopPropagation();
+      multiPicker.stop();
+      elementInspector.stop();
+      autoBugDetector.runDetection();
+    } else if (combo === activeShortcuts.screenshot) {
+      lastTriggeredChord = combo;
+      e.preventDefault();
+      e.stopPropagation();
+      elementInspector.stop();
+      multiPicker.stop();
+      if (activeShortcuts.screenshotMode === 'full') {
+        screenshotTool.captureFullPage();
+      } else {
+        screenshotTool.startAreaCapture();
+      }
+    }
+  },
+  true
+);
 
 // Listen for messages from background service worker or popup
 chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {

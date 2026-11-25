@@ -1,3 +1,16 @@
+import {
+  CustomShortcutsConfig,
+  DEFAULT_CUSTOM_SHORTCUTS,
+  ShortcutActionId,
+} from '@letme/shared';
+import {
+  formatChordFromSet,
+  formatChordPreview,
+  mergeShortcutsConfig,
+  normalizeKeyToken,
+  SHORTCUTS_STORAGE_KEY,
+} from '../shortcuts.js';
+
 const PROVIDER_PRESETS: Record<string, { baseUrl: string; defaultModel: string; hint: string }> = {
   openrouter: {
     baseUrl: 'https://openrouter.ai/api/v1',
@@ -43,6 +56,9 @@ function init() {
 
   // Action Buttons
   const btnStartInspect = document.getElementById('btn-start-inspect');
+  const btnScreenshotToggle = document.getElementById('btn-screenshot-toggle');
+  const screenshotIsland = document.getElementById('screenshot-island');
+  const btnIslandClose = document.getElementById('btn-island-close');
   const btnShotArea = document.getElementById('btn-shot-area');
   const btnShotFull = document.getElementById('btn-shot-full');
   const btnMultiPick = document.getElementById('btn-multi-pick');
@@ -106,9 +122,271 @@ function init() {
   }
 
   // 2. Navigation
+  // Screenshot Dynamic Island Toggle
+  const setIslandOpen = (open: boolean) => {
+    if (!screenshotIsland || !btnScreenshotToggle) return;
+    screenshotIsland.classList.toggle('open', open);
+    screenshotIsland.setAttribute('aria-hidden', String(!open));
+    btnScreenshotToggle.setAttribute('aria-expanded', String(open));
+  };
+
+  btnScreenshotToggle?.addEventListener('click', (e) => {
+    e.stopPropagation();
+    const isOpen = screenshotIsland?.classList.contains('open') ?? false;
+    setIslandOpen(!isOpen);
+  });
+
+  btnIslandClose?.addEventListener('click', (e) => {
+    e.stopPropagation();
+    setIslandOpen(false);
+  });
+
+  document.addEventListener('click', (e) => {
+    if (!screenshotIsland?.classList.contains('open')) return;
+    const target = e.target as Node;
+    if (!screenshotIsland.contains(target) && !btnScreenshotToggle?.contains(target)) {
+      setIslandOpen(false);
+    }
+  });
+
+  // Settings Sub-Tabs & Shortcuts
+  const tabShortcuts = document.getElementById('tab-shortcuts');
+  const tabAi = document.getElementById('tab-ai');
+  const panelShortcuts = document.getElementById('panel-shortcuts');
+  const shortcutStatus = document.getElementById('shortcut-status');
+  const btnModeArea = document.getElementById('btn-mode-area');
+  const btnModeFull = document.getElementById('btn-mode-full');
+  const btnResetAllShortcuts = document.getElementById('btn-reset-all-shortcuts');
+  const btnChromeShortcuts = document.getElementById('btn-chrome-shortcuts');
+  const footerShortcut = document.getElementById('footer-shortcut');
+
+  const recorderButtons = Array.from(
+    document.querySelectorAll<HTMLButtonElement>('.shortcut-recorder')
+  );
+  const resetButtons = Array.from(
+    document.querySelectorAll<HTMLButtonElement>('.shortcut-reset-btn')
+  );
+
+  let currentShortcuts: CustomShortcutsConfig = { ...DEFAULT_CUSTOM_SHORTCUTS };
+  let recordingAction: ShortcutActionId | null = null;
+  let heldKeys = new Set<string>();
+  let peakKeys = new Set<string>();
+
+  function switchSettingsTab(tab: 'shortcuts' | 'ai') {
+    const isShortcuts = tab === 'shortcuts';
+    tabShortcuts?.classList.toggle('active', isShortcuts);
+    tabAi?.classList.toggle('active', !isShortcuts);
+    tabShortcuts?.setAttribute('aria-selected', String(isShortcuts));
+    tabAi?.setAttribute('aria-selected', String(!isShortcuts));
+    panelShortcuts?.classList.toggle('active', isShortcuts);
+    formSettings?.classList.toggle('active', !isShortcuts);
+  }
+
+  function showShortcutStatus(msg: string) {
+    if (!shortcutStatus) return;
+    shortcutStatus.innerText = msg;
+    setTimeout(() => {
+      if (shortcutStatus.innerText === msg) shortcutStatus.innerText = '';
+    }, 2000);
+  }
+
+  function renderShortcutsUI(cfg: CustomShortcutsConfig) {
+    currentShortcuts = cfg;
+    recorderButtons.forEach((btn) => {
+      const action = btn.dataset.action as ShortcutActionId | undefined;
+      if (!action) return;
+      btn.classList.remove('recording');
+      btn.innerText = cfg[action];
+    });
+
+    (['inspect', 'pickAudit', 'pickAi', 'screenshot'] as ShortcutActionId[]).forEach((action) => {
+      const chip = document.getElementById(`chip-${action}`);
+      if (chip) chip.innerText = cfg[action];
+    });
+
+    if (footerShortcut) {
+      footerShortcut.innerHTML = `<kbd>${cfg.inspect}</kbd>`;
+    }
+
+    btnModeArea?.classList.toggle('active', cfg.screenshotMode === 'area');
+    btnModeFull?.classList.toggle('active', cfg.screenshotMode === 'full');
+  }
+
+  async function saveShortcuts(next: CustomShortcutsConfig, message = 'Shortcut saved!') {
+    await chrome.storage.local.set({ [SHORTCUTS_STORAGE_KEY]: next });
+    renderShortcutsUI(next);
+    showShortcutStatus(message);
+  }
+
+  chrome.storage.local.get(SHORTCUTS_STORAGE_KEY).then((data) => {
+    renderShortcutsUI(mergeShortcutsConfig(data[SHORTCUTS_STORAGE_KEY]));
+  });
+
+  tabShortcuts?.addEventListener('click', () => {
+    recordingAction = null;
+    heldKeys.clear();
+    peakKeys.clear();
+    renderShortcutsUI(currentShortcuts);
+    switchSettingsTab('shortcuts');
+  });
+  tabAi?.addEventListener('click', () => {
+    recordingAction = null;
+    heldKeys.clear();
+    peakKeys.clear();
+    renderShortcutsUI(currentShortcuts);
+    switchSettingsTab('ai');
+  });
+
+  // Cancel shortcut recording if user clicks outside any recorder button
+  document.addEventListener('click', (e) => {
+    if (!recordingAction) return;
+    const target = e.target as HTMLElement | null;
+    if (!target?.closest('.shortcut-recorder')) {
+      recordingAction = null;
+      heldKeys.clear();
+      peakKeys.clear();
+      renderShortcutsUI(currentShortcuts);
+    }
+  });
+
+  recorderButtons.forEach((btn) => {
+    btn.addEventListener('click', (e) => {
+      e.preventDefault();
+      const action = btn.dataset.action as ShortcutActionId | undefined;
+      if (!action) return;
+      recorderButtons.forEach((b) => {
+        b.classList.remove('recording');
+        const a = b.dataset.action as ShortcutActionId | undefined;
+        if (a) b.innerText = currentShortcuts[a];
+      });
+      heldKeys.clear();
+      peakKeys.clear();
+      recordingAction = action;
+      btn.classList.add('recording');
+      btn.innerText = 'Press keys...';
+    });
+  });
+
+  resetButtons.forEach((btn) => {
+    btn.addEventListener('click', async () => {
+      const action = btn.dataset.reset as ShortcutActionId | undefined;
+      if (!action) return;
+      recordingAction = null;
+      const next: CustomShortcutsConfig = {
+        ...currentShortcuts,
+        [action]: DEFAULT_CUSTOM_SHORTCUTS[action],
+      };
+      await saveShortcuts(next, 'Reset to default');
+    });
+  });
+
+  btnModeArea?.addEventListener('click', async () => {
+    await saveShortcuts({ ...currentShortcuts, screenshotMode: 'area' }, 'Mode: Area Crop');
+  });
+
+  btnModeFull?.addEventListener('click', async () => {
+    await saveShortcuts({ ...currentShortcuts, screenshotMode: 'full' }, 'Mode: Full Viewport');
+  });
+
+  btnResetAllShortcuts?.addEventListener('click', async () => {
+    recordingAction = null;
+    await saveShortcuts({ ...DEFAULT_CUSTOM_SHORTCUTS }, 'All shortcuts reset');
+  });
+
+  btnChromeShortcuts?.addEventListener('click', () => {
+    chrome.tabs.create({ url: 'chrome://extensions/shortcuts' });
+  });
+
+  document.addEventListener('keydown', (e) => {
+    if (recordingAction) {
+      e.preventDefault();
+      e.stopPropagation();
+
+      if (e.repeat) return;
+
+      if (e.key === 'Escape') {
+        recordingAction = null;
+        heldKeys.clear();
+        peakKeys.clear();
+        renderShortcutsUI(currentShortcuts);
+        return;
+      }
+
+      // Sync modifier state to prevent stuck modifiers
+      if (!e.ctrlKey) heldKeys.delete('Ctrl');
+      if (!e.altKey) heldKeys.delete('Alt');
+      if (!e.shiftKey) heldKeys.delete('Shift');
+      if (!e.metaKey) heldKeys.delete('Meta');
+
+      const token = normalizeKeyToken(e);
+      if (!token) return;
+
+      heldKeys.add(token);
+      peakKeys.add(token);
+
+      const activeBtn = recorderButtons.find((b) => b.dataset.action === recordingAction);
+      if (activeBtn) {
+        activeBtn.innerText = formatChordPreview(peakKeys);
+      }
+      return;
+    }
+
+    if (e.key === 'Escape' && screenshotIsland?.classList.contains('open')) {
+      setIslandOpen(false);
+    }
+  }, true);
+
+  document.addEventListener('keyup', async (e) => {
+    if (!recordingAction) return;
+    e.preventDefault();
+    e.stopPropagation();
+
+    const token = normalizeKeyToken(e);
+    if (token) {
+      heldKeys.delete(token);
+    }
+
+    // Finalize chord once all held keys are released
+    if (heldKeys.size === 0 && peakKeys.size > 0) {
+      const combo = formatChordFromSet(peakKeys);
+      const targetAction = recordingAction;
+      recordingAction = null;
+      heldKeys.clear();
+      peakKeys.clear();
+
+      if (!combo) {
+        renderShortcutsUI(currentShortcuts);
+        showShortcutStatus('Use modifier+key or 2+ keys (e.g. I+O+U)');
+        return;
+      }
+
+      const conflict = (['inspect', 'pickAudit', 'pickAi', 'screenshot'] as ShortcutActionId[]).find(
+        (id) => id !== targetAction && currentShortcuts[id] === combo
+      );
+      if (conflict) {
+        renderShortcutsUI(currentShortcuts);
+        showShortcutStatus(`"${combo}" already used!`);
+        return;
+      }
+
+      await saveShortcuts({ ...currentShortcuts, [targetAction]: combo });
+    }
+  }, true);
+
+  window.addEventListener('blur', () => {
+    if (recordingAction) {
+      recordingAction = null;
+      heldKeys.clear();
+      peakKeys.clear();
+      renderShortcutsUI(currentShortcuts);
+    }
+  });
+
   btnTabSettings?.addEventListener('click', () => {
+    setIslandOpen(false);
     viewActions?.classList.remove('active');
     viewSettings?.classList.add('active');
+    switchSettingsTab('shortcuts');
     loadSettings();
   });
 
@@ -123,6 +401,14 @@ function init() {
     const p = selectProvider.value;
     const preset = PROVIDER_PRESETS[p];
     if (!preset) return;
+
+    if (selectModel) {
+      selectModel.style.display = 'none';
+      selectModel.innerHTML = '';
+    }
+    if (modelFetchStatus) {
+      modelFetchStatus.innerText = 'Auto-detect with button above or type manually';
+    }
 
     if (p === 'custom') {
       fieldCustomUrl.style.display = 'flex';
@@ -271,8 +557,8 @@ function init() {
       }
 
       if (!key && p !== 'ollama') {
-        if (badgeAiProvider) badgeAiProvider.innerText = 'Not Set';
-        if (aiProviderInfo) aiProviderInfo.innerText = 'Open Settings tab to enter API Key';
+        if (badgeAiProvider) badgeAiProvider.innerText = 'AI: No Key';
+        if (aiProviderInfo) aiProviderInfo.innerText = 'Open Settings → AI Vision to enter API Key';
         return;
       }
 
@@ -326,7 +612,7 @@ function init() {
       url.startsWith('about:');
 
     if (isRestrictedUrl) {
-      [btnStartInspect, btnShotArea, btnShotFull, btnMultiPick, btnAutoBug].forEach((btn) => {
+      [btnStartInspect, btnScreenshotToggle, btnShotArea, btnShotFull, btnMultiPick, btnAutoBug].forEach((btn) => {
         if (btn) {
           (btn as HTMLButtonElement).disabled = true;
           btn.style.opacity = '0.4';
@@ -391,6 +677,7 @@ function init() {
         );
         viewActions?.classList.remove('active');
         viewSettings?.classList.add('active');
+        switchSettingsTab('ai');
         loadSettings();
         return;
       }
@@ -403,6 +690,7 @@ function init() {
         );
         viewActions?.classList.remove('active');
         viewSettings?.classList.add('active');
+        switchSettingsTab('ai');
         loadSettings();
         return;
       }

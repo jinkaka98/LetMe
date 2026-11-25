@@ -192,3 +192,42 @@ test('handleGetActiveElement outputs rich layout diagnostics and image block', (
   assert.equal(res.content[1].mimeType, 'image/png');
   assert.ok((res.content[1] as any).data.length > 10);
 });
+
+test('StateStore.deleteSnapshot removes snapshot and updates activeElement', () => {
+  const store = new StateStore();
+  const snap1: ElementSnapshot = {
+    id: 'snap_del_1',
+    timestamp: 1000,
+    url: 'https://example.com',
+    pageTitle: 'Example',
+    selector: '#first',
+    tagName: 'div',
+    classNames: [],
+    outerHtmlSnippet: '<div id="first"></div>',
+    boxModel: {
+      width: 100,
+      height: 50,
+      margin: { top: 0, right: 0, bottom: 0, left: 0 },
+      border: { top: 0, right: 0, bottom: 0, left: 0 },
+      padding: { top: 0, right: 0, bottom: 0, left: 0 },
+      content: { width: 100, height: 50 },
+      boundingBox: { x: 0, y: 0, top: 0, right: 100, bottom: 50, left: 0, width: 100, height: 50 },
+    },
+    layoutContext: { parentTagName: 'body', parentSelector: 'body', display: 'block', position: 'static', isFlexChild: false, isGridChild: false },
+    layoutBugs: { hasHorizontalScrollLeak: false, isClippedByAncestor: false, hasZIndexConflict: false, zIndex: 'auto', warnings: [] },
+    computedStyles: {},
+    annotations: [],
+    viewport: { width: 1280, height: 720, devicePixelRatio: 1 },
+  };
+  const snap2: ElementSnapshot = { ...snap1, id: 'snap_del_2', selector: '#second' };
+
+  store.setActiveElement(snap1);
+  store.setActiveElement(snap2);
+  assert.equal(store.getSnapshots().length, 2);
+  assert.equal(store.getActiveElement()?.id, 'snap_del_2');
+
+  assert.equal(store.deleteSnapshot('snap_del_2'), true);
+  assert.equal(store.getSnapshots().length, 1);
+  assert.equal(store.getActiveElement()?.id, 'snap_del_1');
+  assert.equal(store.deleteSnapshot('nonexistent'), false);
+});

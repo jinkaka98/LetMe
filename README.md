@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="packages/extension/public/icons/logo.svg" alt="LetMe Logo" width="100" height="100" />
+  <img src="packages/extension/public/icons/logo.png" alt="LetMe Logo" width="100" height="100" />
 </p>
 
 <h1 align="center">LetMe</h1>
@@ -34,38 +34,27 @@ With LetMe, you can inspect DOM elements, draw vector markup annotations, run mu
 
 ## Key Capabilities
 
-### 1. Precision Element Inspector
-- **Full Box Model Telemetry**: Computes content, padding, border, and margin dimensions down to the exact sub-pixel.
-- **Computed Styles Extraction**: Extracts key layout rules (`display`, `position`, `flex`, `grid`, `z-index`, `overflow`) without clutter.
-- **Clean DOM & Selector Generation**: Generates deterministic CSS selectors (`div.card > span#title`) and trimmed outerHTML snippets.
-- **Automated Layout Diagnostics**: Instantly flags ancestor clipping, z-index collisions, and horizontal viewport overflow leaks.
+### 1. Precision Element Inspector & Floating Studio HUD
+- **Excalidraw × Photoshop Floating HUD**: Unobtrusive top-center toolbar, collapsible **Layers Panel** with cropped element thumbnails, and side-by-side **Properties Modal** isolated in Shadow DOM.
+- **Blueprint Selection & Multi-Layer Tagging**: Pick multiple DOM elements with CAD-style corner handles, dimension callouts, category tags (`Bug`, `Design`, `Edit`, `Note`), per-layer notes, and **Raw Payload Preview**.
+- **Full Box Model & Layout Diagnostics**: Computes sub-pixel box model metrics, clean CSS selectors, trimmed outerHTML, and flags ancestor clipping, z-index collisions, and horizontal overflow leaks.
 
-### 2. Canvas Markup Studio
-- **Overlay Vector Annotations**: Draw arrows, bounding boxes, pixel measurement rulers, draggable text callouts, and censorship blur blocks directly over the page.
-- **Non-Destructive Canvas**: Annotations render cleanly on an isolated viewport canvas without mutating webpage DOM or styling.
+### 2. Canvas Markup Studio (Full Transform & Annotation Suite)
+- **Complete Vector Tools**: Draw 6 shapes (*Box, Rounded Box, Circle, Diamond, Triangle, Pill*), arrows, alignment lines, pixel rulers, freehand pen, **direct inline text** (*Montserrat, Poppins, Calibri, Arial, 4-Bit*), and **pixelated Censored blur** with icon.
+- **8-Handle Resize, Rotate & Eraser**: Use **Hand (`H`)** to move, 8-side resize, or rotate any annotation; use **Eraser (`E`)** for point-and-click deletion; customize any color via circular **Color Picker + Hex input** and adjustable **`▲/▼` px** stroke width.
+- **Per-Layer Scoped Annotations**: Annotations are saved per-layer so switching layers cleanly isolates markups for each target element.
 
-### 3. AI Vision Auto Bug Hunter
-- **Multimodal Automated Audit**: Leverages any vision LLM (e.g., Google Gemini 2.0 Flash, Claude 3.5 Sonnet, GPT-4o via OpenRouter, Groq, or Ollama) to autonomously spot UI/UX defects, misalignment, and text truncation.
-- **Contextual DOM Text Snapping**: Intelligently anchors detected visual anomalies directly to real underlying DOM nodes.
-- **60 FPS Scroll Tracking**: High-performance `requestAnimationFrame` synchronization ensures bounding boxes and pin badges remain attached to elements during fast scrolling.
-- **Interactive Slide-over Drawer**: Inspect bugs categorized by severity (`critical`, `warning`, `suggestion`), filter issues, and click to smooth-scroll directly to affected elements.
+### 3. Monochrome Blueprint Popup, Dynamic Island & Custom Shortcuts
+- **Monochrome Black & White Blueprint UI**: Crisp technical grid aesthetic with **Pick & audit** grouping (`Pick Audit` + `Pick with AI`) and a **Dynamic Island** selector for `Screenshot` (`Area Crop` / `Full Viewport`).
+- **Customizable Multi-Key Shortcuts**: Configure shortcuts for all 4 main actions directly in `Settings → Shortcuts` (supports modifier combos like `Alt+Shift+I` and multi-press chords like `I+O+U`).
 
-### 4. Multi-Element Stager
-- **Batch Component Capture**: Click multiple UI elements across different sections or routes in a single session.
-- **Per-Element Developer Notes**: Attach specific instructions or bug observations to each staged component.
-- **Consolidated Dispatch**: Generates a unified, structured prompt with a unique session code (`[LETME MULTI-ELEMENT STAGE: LTM-...]`) ready for immediate pasting into chat.
+### 4. Right MCP Storage Sidebar & Bidirectional Live CSS Preview
+- **Live MCP Storage Inspector**: Toggleable right-hand sidebar (`MCP (N)`) to inspect captured snapshots stored in MCP and delete mistaken entries before the AI reads them.
+- **Zero-Reload CSS Preview**: Coding agents can invoke `letme_apply_css_preview` and `letme_clear_preview` to test CSS fixes live in your active browser tab.
 
-### 5. Interactive Area Crop & Viewport Studio
-- **Crosshair Selection**: Drag to capture any rectangular region or take full-viewport screenshots.
-- **Instant Clipboard Integration**: Automatically formats and copies screenshots to your system clipboard while staging them in MCP.
-
-### 6. Bidirectional Live CSS Preview
-- **Zero-Reload Visual Testing**: Coding agents can invoke the `letme_apply_css_preview` MCP tool to apply CSS changes directly onto the active webpage.
-- **Instant Reversion**: One-click reversion (`letme_clear_preview`) restores the original styling once approved or discarded.
-
-### 7. Monochrome Minimalist Aesthetic
-- **Zero AI Slop**: Built with an anti-bloat, high-contrast Linear/Vercel design system.
-- **Official Lucide SVG Icons**: 100% inline vector icons for sharp rendering across high-DPI and Retina displays.
+### 5. AI Vision Auto Bug Hunter & Area Screenshot Studio
+- **Multimodal Automated Audit**: Uses any OpenAI-compatible vision LLM (Gemini, OpenRouter, OpenAI, Groq, Ollama) with 60 FPS scroll-tracked pins and severity filtering.
+- **Interactive Area Crop & Viewport Capture**: Crosshair selection or full-viewport capture with instant clipboard sync and MCP staging.
 
 ---
 

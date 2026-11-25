@@ -11,13 +11,7 @@
     <!-- Header -->
     <header class="header">
       <div class="logo">
-        <svg class="logo-icon" viewBox="0 0 128 128" width="22" height="22">
-          <rect width="128" height="128" rx="24" fill="#09090b" stroke="#27272a" stroke-width="4"/>
-          <path d="M32 0v128M64 0v128M96 0v128M0 32h128M0 64h128M0 96h128" stroke="#18181b" stroke-width="3"/>
-          <circle cx="64" cy="64" r="23" fill="none" stroke="#52525b" stroke-width="3" stroke-dasharray="4 2"/>
-          <path d="M28 44V28h16M100 44V28H84M28 84v16h16M100 84v16H84" fill="none" stroke="#fafafa" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/>
-          <circle cx="64" cy="64" r="9" fill="#ffffff"/>
-        </svg>
+        <img class="logo-icon" src="icons/icon-48.png" alt="LetMe Logo" width="22" height="22" />
         <span class="logo-text">LetMe</span>
       </div>
 
@@ -36,82 +30,149 @@
     <main class="main-view">
       <!-- Actions View -->
       <div id="view-actions" class="view active">
-        <!-- Action 1: Element Inspector (Manual) -->
-        <section class="action-card">
-          <div class="card-header">
-            <span class="card-title">1. Element Inspector</span>
-            <span class="card-badge">Manual</span>
-          </div>
-          <button id="btn-start-inspect" class="btn-primary">
+        <!-- Primary Inspector CTA -->
+        <button id="btn-start-inspect" class="btn-primary blueprint-box">
+          <span class="btn-left">
             <span class="btn-icon">
               <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="22" x2="18" y1="12" y2="12"/><line x1="6" x2="2" y1="12" y2="12"/><line x1="12" x2="12" y1="2" y2="6"/><line x1="12" x2="12" y1="18" y2="22"/></svg>
             </span>
             <span id="label-start-inspect">Start Element Inspector</span>
-          </button>
+          </span>
+          <span id="chip-inspect" class="kbd-chip kbd-chip-dark">Alt+Shift+I</span>
+        </button>
+
+        <!-- Pick & Audit Group -->
+        <section class="action-card blueprint-box">
+          <div class="card-header">
+            <span class="card-title">Pick &amp; audit</span>
+            <span id="badge-ai-provider" class="card-badge">AI Vision</span>
+          </div>
+          <div class="btn-stack">
+            <button id="btn-multi-pick" class="btn-secondary btn-full btn-split">
+              <span class="btn-left">
+                <span class="btn-icon">
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 9 5 12 1.8-5.2L21 14Z"/><path d="M7.2 2.2 8 5.1"/><path d="m5.1 8-2.9-.8"/><path d="M14 4.1 12 6"/><path d="m6 12-1.9 2"/></svg>
+                </span>
+                <span>Pick Audit</span>
+              </span>
+              <span id="chip-pickAudit" class="kbd-chip">Alt+Shift+P</span>
+            </button>
+            <button id="btn-auto-bug" class="btn-secondary btn-full btn-split">
+              <span class="btn-left">
+                <span class="btn-icon">
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 8V4H8"/><rect width="16" height="12" x="4" y="8" rx="2"/><path d="M2 14h2"/><path d="M20 14h2"/><path d="M15 13v2"/><path d="M9 13v2"/></svg>
+                </span>
+                <span>Pick with AI</span>
+              </span>
+              <span id="chip-pickAi" class="kbd-chip">Alt+Shift+A</span>
+            </button>
+          </div>
+          <div id="ai-provider-info" class="card-footnote">Config: OpenRouter / Gemini in Settings</div>
         </section>
 
-        <!-- Action 2: Multi-Element Pick -->
-        <section class="action-card">
-          <div class="card-header">
-            <span class="card-title">2. Multi-Element Stager</span>
-            <span class="card-badge">Diagnostic</span>
-          </div>
-          <button id="btn-multi-pick" class="btn-secondary btn-full">
-            <span class="btn-icon">
-              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 9 5 12 1.8-5.2L21 14Z"/><path d="M7.2 2.2 8 5.1"/><path d="m5.1 8-2.9-.8"/><path d="M14 4.1 12 6"/><path d="m6 12-1.9 2"/></svg>
-            </span>
-            <span>Pick Elements & Staging</span>
-          </button>
-        </section>
-
-        <!-- Action 3: Screenshot -->
-        <section class="action-card">
-          <div class="card-header">
-            <span class="card-title">3. Screenshot Capture</span>
-          </div>
-          <div class="btn-group">
-            <button id="btn-shot-area" class="btn-secondary">
+        <!-- Screenshot Single Trigger + Dynamic Island -->
+        <div class="screenshot-wrap">
+          <button id="btn-screenshot-toggle" class="btn-secondary btn-full btn-split blueprint-box" aria-expanded="false">
+            <span class="btn-left">
               <span class="btn-icon">
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 2v14a2 2 0 0 0 2 2h14"/><path d="M18 22V8a2 2 0 0 0-2-2H2"/></svg>
               </span>
-              <span>Area Crop</span>
-            </button>
-            <button id="btn-shot-full" class="btn-secondary">
-              <span class="btn-icon">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3H5a2 2 0 0 0-2 2v3"/><path d="M21 8V5a2 2 0 0 0-2-2h-3"/><path d="M3 16v3a2 2 0 0 0 2 2h3"/><path d="M16 21h3a2 2 0 0 0 2-2v-3"/></svg>
-              </span>
-              <span>Full Viewport</span>
-            </button>
-          </div>
-        </section>
-
-        <!-- Action 4: AI Auto Bug Detection -->
-        <section class="action-card">
-          <div class="card-header">
-            <span class="card-title">4. AI Vision Auto-Detect</span>
-            <span id="badge-ai-provider" class="card-badge">AI Vision</span>
-          </div>
-          <button id="btn-auto-bug" class="btn-secondary btn-full">
-            <span class="btn-icon">
-              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 8V4H8"/><rect width="16" height="12" x="4" y="8" rx="2"/><path d="M2 14h2"/><path d="M20 14h2"/><path d="M15 13v2"/><path d="M9 13v2"/></svg>
+              <span>Screenshot</span>
             </span>
-            <span>Scan Page with AI Vision</span>
+            <span id="chip-screenshot" class="kbd-chip">Alt+Shift+S</span>
           </button>
-          <div id="ai-provider-info" class="card-footnote">Config: OpenRouter / Gemini in Settings</div>
-        </section>
+
+          <div id="screenshot-island" class="dynamic-island" aria-hidden="true">
+            <div class="island-inner">
+              <button id="btn-shot-area" class="island-btn">
+                <span class="btn-icon">
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 2v14a2 2 0 0 0 2 2h14"/><path d="M18 22V8a2 2 0 0 0-2-2H2"/></svg>
+                </span>
+                <span>Area Crop</span>
+              </button>
+              <span class="island-divider"></span>
+              <button id="btn-shot-full" class="island-btn">
+                <span class="btn-icon">
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3H5a2 2 0 0 0-2 2v3"/><path d="M21 8V5a2 2 0 0 0-2-2h-3"/><path d="M3 16v3a2 2 0 0 0 2 2h3"/><path d="M16 21h3a2 2 0 0 0 2-2v-3"/></svg>
+                </span>
+                <span>Full Viewport</span>
+              </button>
+              <button id="btn-island-close" class="island-close" title="Close" aria-label="Close">×</button>
+            </div>
+          </div>
+        </div>
       </div>
 
       <!-- Settings View -->
       <div id="view-settings" class="view">
         <div class="settings-header">
-          <span class="settings-title">AI Vision API Settings</span>
+          <span class="settings-title">Settings</span>
           <button id="btn-back-actions" class="link-btn">
             <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m12 19-7-7 7-7"/><path d="M19 12H5"/></svg>
             <span>Back</span>
           </button>
         </div>
 
-        <form id="form-settings" class="settings-form">
+        <!-- Seamless Sub-Tabs -->
+        <div class="settings-tabs blueprint-box" role="tablist">
+          <button type="button" id="tab-shortcuts" class="settings-tab active" data-tab="shortcuts" role="tab" aria-selected="true">Shortcuts</button>
+          <button type="button" id="tab-ai" class="settings-tab" data-tab="ai" role="tab" aria-selected="false">AI Vision</button>
+        </div>
+
+        <!-- Sub-Tab 1: Custom Shortcuts -->
+        <div id="panel-shortcuts" class="settings-panel active blueprint-box">
+          <div class="shortcut-list">
+            <div class="shortcut-row">
+              <span class="shortcut-label">1. Element Inspector</span>
+              <div class="shortcut-controls">
+                <button type="button" class="shortcut-recorder" data-action="inspect" title="Click and press key combo">Alt+Shift+I</button>
+                <button type="button" class="shortcut-reset-btn" data-reset="inspect" title="Reset default">↺</button>
+              </div>
+            </div>
+
+            <div class="shortcut-row">
+              <span class="shortcut-label">2. Pick Audit</span>
+              <div class="shortcut-controls">
+                <button type="button" class="shortcut-recorder" data-action="pickAudit" title="Click and press key combo">Alt+Shift+P</button>
+                <button type="button" class="shortcut-reset-btn" data-reset="pickAudit" title="Reset default">↺</button>
+              </div>
+            </div>
+
+            <div class="shortcut-row">
+              <span class="shortcut-label">3. Pick with AI</span>
+              <div class="shortcut-controls">
+                <button type="button" class="shortcut-recorder" data-action="pickAi" title="Click and press key combo">Alt+Shift+A</button>
+                <button type="button" class="shortcut-reset-btn" data-reset="pickAi" title="Reset default">↺</button>
+              </div>
+            </div>
+
+            <div class="shortcut-row shortcut-row-col">
+              <div class="shortcut-row-top">
+                <span class="shortcut-label">4. Screenshot</span>
+                <div class="shortcut-controls">
+                  <button type="button" class="shortcut-recorder" data-action="screenshot" title="Click and press key combo">Alt+Shift+S</button>
+                  <button type="button" class="shortcut-reset-btn" data-reset="screenshot" title="Reset default">↺</button>
+                </div>
+              </div>
+              <div class="shortcut-mode-row">
+                <span class="shortcut-mode-label">Shortcut mode:</span>
+                <div class="mode-pill">
+                  <button type="button" id="btn-mode-area" class="mode-pill-btn active" data-mode="area">Area</button>
+                  <button type="button" id="btn-mode-full" class="mode-pill-btn" data-mode="full">Full</button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="settings-actions-row">
+            <button type="button" id="btn-reset-all-shortcuts" class="link-btn">Reset Defaults</button>
+            <button type="button" id="btn-chrome-shortcuts" class="link-btn">Chrome Shortcuts →</button>
+          </div>
+          <div id="shortcut-status" class="save-status"></div>
+        </div>
+
+        <!-- Sub-Tab 2: AI Vision -->
+        <form id="form-settings" class="settings-form settings-panel blueprint-box">
           <div class="field">
             <label for="select-provider">AI Provider:</label>
             <select id="select-provider" class="select-field">
@@ -161,8 +222,8 @@
 
     <!-- Footer -->
     <footer class="footer">
-      <span>Shortcut: <kbd>Alt</kbd>+<kbd>Shift</kbd>+<kbd>I</kbd></span>
-      <span class="port-info">ws://127.0.0.1:8765</span>
+      <span>Shortcut: <span id="footer-shortcut"><kbd>Alt+Shift+I</kbd></span></span>
+      <span class="port-info">mcp: ws://127.0.0.1:8765</span>
     </footer>
   </div>
 

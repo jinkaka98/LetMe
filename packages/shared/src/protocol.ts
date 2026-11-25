@@ -1,4 +1,10 @@
-import { ElementSnapshot, LivePreviewRequest, ConsoleLogEntry, LivePreviewResult } from './types.js';
+import {
+  ElementSnapshot,
+  LivePreviewRequest,
+  ConsoleLogEntry,
+  LivePreviewResult,
+  McpSnapshotSummary,
+} from './types.js';
 
 export const DEFAULT_WS_PORT = 8765;
 
@@ -7,6 +13,8 @@ export type ClientMessageType =
   | 'ELEMENT_CAPTURED'
   | 'LIVE_PREVIEW_APPLIED'
   | 'CONSOLE_LOGS'
+  | 'LIST_SNAPSHOTS'
+  | 'DELETE_SNAPSHOT'
   | 'PING';
 
 export type ServerMessageType =
@@ -14,6 +22,7 @@ export type ServerMessageType =
   | 'APPLY_CSS_PREVIEW'
   | 'CLEAR_CSS_PREVIEW'
   | 'HIGHLIGHT_ELEMENT'
+  | 'SNAPSHOTS_LIST'
   | 'REQUEST_ACTIVE_ELEMENT';
 
 export interface BaseMessage<T extends string, P = any> {
@@ -33,6 +42,8 @@ export type ClientMessage =
   | BaseMessage<'ELEMENT_CAPTURED', ElementSnapshot>
   | BaseMessage<'LIVE_PREVIEW_APPLIED', LivePreviewResult>
   | BaseMessage<'CONSOLE_LOGS', { url: string; logs: ConsoleLogEntry[] }>
+  | BaseMessage<'LIST_SNAPSHOTS', Record<string, never>>
+  | BaseMessage<'DELETE_SNAPSHOT', { id: string }>
   | BaseMessage<'PING', { timestamp: number }>;
 
 export type ServerMessage =
@@ -40,4 +51,5 @@ export type ServerMessage =
   | BaseMessage<'APPLY_CSS_PREVIEW', LivePreviewRequest>
   | BaseMessage<'CLEAR_CSS_PREVIEW', { selector?: string }>
   | BaseMessage<'HIGHLIGHT_ELEMENT', { selector: string; durationMs?: number }>
+  | BaseMessage<'SNAPSHOTS_LIST', { snapshots: McpSnapshotSummary[] }>
   | BaseMessage<'REQUEST_ACTIVE_ELEMENT', Record<string, never>>;
