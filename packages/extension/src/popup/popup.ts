@@ -44,6 +44,25 @@ const PROVIDER_PRESETS: Record<string, { baseUrl: string; defaultModel: string; 
   },
 };
 
+function buildIntegrationPrompt(port: number): string {
+  const envBlock = port !== 8765 ? `,\n      "env": { "LETME_WS_PORT": "${port}" }` : '';
+  return `Connect LetMe MCP Server to this coding agent/harness using this configuration:
+
+\`\`\`json
+{
+  "mcpServers": {
+    "letme": {
+      "command": "npx",
+      "args": ["-y", "@letme/mcp-server"]${envBlock}
+    }
+  }
+}
+\`\`\`
+
+Local bridge endpoint: http://127.0.0.1:${port}
+Once connected, use \`letme_get_active_element\`, \`letme_list_inspections\`, \`letme_apply_css_preview\`, and \`letme_clear_preview\` to inspect and debug UI live.`;
+}
+
 function init() {
   const statusBadge = document.getElementById('mcp-status');
   const statusText = document.getElementById('mcp-status-text');
@@ -61,7 +80,6 @@ function init() {
   const btnIslandClose = document.getElementById('btn-island-close');
   const btnShotArea = document.getElementById('btn-shot-area');
   const btnShotFull = document.getElementById('btn-shot-full');
-  const btnMultiPick = document.getElementById('btn-multi-pick');
   const btnAutoBug = document.getElementById('btn-auto-bug');
   const badgeAiProvider = document.getElementById('badge-ai-provider');
   const aiProviderInfo = document.getElementById('ai-provider-info');
@@ -79,86 +97,27 @@ function init() {
   const modelFetchStatus = document.getElementById('model-fetch-status');
   const settingsStatus = document.getElementById('settings-status');
 
-  // Clear legacy inspectMode flag if stored
-  chrome.storage.local.remove('inspectMode');
-
-  // 1. Check MCP Status (Initial + Broadcasts + Polling)
-  chrome.runtime.sendMessage({ type: 'GET_MCP_STATUS' }, (res) => {
-    updateMcpStatus(res?.connected ?? false);
-  });
-
-  chrome.runtime.onMessage.addListener((msg) => {
-    if (msg.type === 'MCP_STATUS_CHANGED') {
-      updateMcpStatus(msg.connected ?? false);
-    }
-  });
-
-  const statusPollInterval = setInterval(() => {
-    chrome.runtime.sendMessage({ type: 'GET_MCP_STATUS' }, (res) => {
-      updateMcpStatus(res?.connected ?? false);
-    });
-  }, 1500);
-
-  window.addEventListener('unload', () => {
-    clearInterval(statusPollInterval);
-  });
-
-  statusBadge?.addEventListener('click', () => {
-    if (statusText) statusText.innerText = 'Connecting...';
-    chrome.runtime.sendMessage({ type: 'GET_MCP_STATUS' }, (res) => {
-      updateMcpStatus(res?.connected ?? false);
-    });
-  });
-
-  function updateMcpStatus(connected: boolean) {
-    if (!statusBadge || !statusText) return;
-    if (connected) {
-      statusBadge.className = 'status-badge connected';
-      statusText.innerText = 'Connected';
-    } else {
-      statusBadge.className = 'status-badge disconnected';
-      statusText.innerText = 'Offline';
-    }
-  }
-
-  // 2. Navigation
-  // Screenshot Dynamic Island Toggle
-  const setIslandOpen = (open: boolean) => {
-    if (!screenshotIsland || !btnScreenshotToggle) return;
-    screenshotIsland.classList.toggle('open', open);
-    screenshotIsland.setAttribute('aria-hidden', String(!open));
-    btnScreenshotToggle.setAttribute('aria-expanded', String(open));
-  };
-
-  btnScreenshotToggle?.addEventListener('click', (e) => {
-    e.stopPropagation();
-    const isOpen = screenshotIsland?.classList.contains('open') ?? false;
-    setIslandOpen(!isOpen);
-  });
-
-  btnIslandClose?.addEventListener('click', (e) => {
-    e.stopPropagation();
-    setIslandOpen(false);
-  });
-
-  document.addEventListener('click', (e) => {
-    if (!screenshotIsland?.classList.contains('open')) return;
-    const target = e.target as Node;
-    if (!screenshotIsland.contains(target) && !btnScreenshotToggle?.contains(target)) {
-      setIslandOpen(false);
-    }
-  });
-
   // Settings Sub-Tabs & Shortcuts
   const tabShortcuts = document.getElementById('tab-shortcuts');
   const tabAi = document.getElementById('tab-ai');
+  const tabConfig = document.getElementById('tab-config');
   const panelShortcuts = document.getElementById('panel-shortcuts');
+  const panelConfig = document.getElementById('panel-config');
   const shortcutStatus = document.getElementById('shortcut-status');
   const btnModeArea = document.getElementById('btn-mode-area');
   const btnModeFull = document.getElementById('btn-mode-full');
   const btnResetAllShortcuts = document.getElementById('btn-reset-all-shortcuts');
   const btnChromeShortcuts = document.getElementById('btn-chrome-shortcuts');
   const footerShortcut = document.getElementById('footer-shortcut');
+  const footerMcpUrl = document.getElementById('footer-mcp-url');
+
+  // Config Tab Elements
+  const inputMcpPort = document.getElementById('input-mcp-port') as HTMLInputElement;
+  const btnSavePort = document.getElementById('btn-save-port');
+  const portStatus = document.getElementById('port-status');
+  const integrationPreview = document.getElementById('integration-preview');
+  const btnCopyIntegration = document.getElementById('btn-copy-integration');
+  const configCopyStatus = document.getElementById('config-copy-status');
 
   const recorderButtons = Array.from(
     document.querySelectorAll<HTMLButtonElement>('.shortcut-recorder')
@@ -168,19 +127,61 @@ function init() {
   );
 
   let currentShortcuts: CustomShortcutsConfig = { ...DEFAULT_CUSTOM_SHORTCUTS };
+  let currentPort = 8765;
   let recordingAction: ShortcutActionId | null = null;
   let heldKeys = new Set<string>();
   let peakKeys = new Set<string>();
 
-  function switchSettingsTab(tab: 'shortcuts' | 'ai') {
+  function switchSettingsTab(tab: 'shortcuts' | 'ai' | 'config') {
     const isShortcuts = tab === 'shortcuts';
+    const isAi = tab === 'ai';
+    const isConfig = tab === 'config';
+
     tabShortcuts?.classList.toggle('active', isShortcuts);
-    tabAi?.classList.toggle('active', !isShortcuts);
+    tabAi?.classList.toggle('active', isAi);
+    tabConfig?.classList.toggle('active', isConfig);
     tabShortcuts?.setAttribute('aria-selected', String(isShortcuts));
-    tabAi?.setAttribute('aria-selected', String(!isShortcuts));
+    tabAi?.setAttribute('aria-selected', String(isAi));
+    tabConfig?.setAttribute('aria-selected', String(isConfig));
+
     panelShortcuts?.classList.toggle('active', isShortcuts);
-    formSettings?.classList.toggle('active', !isShortcuts);
+    formSettings?.classList.toggle('active', isAi);
+    panelConfig?.classList.toggle('active', isConfig);
   }
+
+  function renderPortConfig(port: number) {
+    currentPort = port;
+    if (inputMcpPort) inputMcpPort.value = String(port);
+    if (footerMcpUrl) footerMcpUrl.innerText = `mcp: http://127.0.0.1:${port}`;
+    if (portStatus) portStatus.innerText = `Active: http://127.0.0.1:${port}`;
+    if (integrationPreview) integrationPreview.innerText = buildIntegrationPrompt(port);
+  }
+
+  chrome.storage.local.get('mcpPort').then((data) => {
+    const p = Number(data.mcpPort);
+    renderPortConfig(Number.isInteger(p) && p > 0 && p <= 65535 ? p : 8765);
+  });
+
+  btnSavePort?.addEventListener('click', async () => {
+    const p = Number(inputMcpPort?.value);
+    if (!Number.isInteger(p) || p < 1024 || p > 65535) {
+      if (portStatus) portStatus.innerText = 'Port must be between 1024 and 65535';
+      return;
+    }
+    await chrome.storage.local.set({ mcpPort: p });
+    renderPortConfig(p);
+    if (portStatus) portStatus.innerText = `Saved port ${p}! Reconnecting...`;
+  });
+
+  btnCopyIntegration?.addEventListener('click', () => {
+    navigator.clipboard.writeText(buildIntegrationPrompt(currentPort));
+    if (configCopyStatus) {
+      configCopyStatus.innerText = 'Integration prompt copied!';
+      setTimeout(() => {
+        if (configCopyStatus) configCopyStatus.innerText = '';
+      }, 2000);
+    }
+  });
 
   function showShortcutStatus(msg: string) {
     if (!shortcutStatus) return;
@@ -199,7 +200,7 @@ function init() {
       btn.innerText = cfg[action];
     });
 
-    (['inspect', 'pickAudit', 'pickAi', 'screenshot'] as ShortcutActionId[]).forEach((action) => {
+    (['inspect', 'pickAi', 'screenshot'] as ShortcutActionId[]).forEach((action) => {
       const chip = document.getElementById(`chip-${action}`);
       if (chip) chip.innerText = cfg[action];
     });
@@ -222,30 +223,23 @@ function init() {
     renderShortcutsUI(mergeShortcutsConfig(data[SHORTCUTS_STORAGE_KEY]));
   });
 
-  tabShortcuts?.addEventListener('click', () => {
+  function cancelRecording() {
+    if (!recordingAction) return;
     recordingAction = null;
     heldKeys.clear();
     peakKeys.clear();
     renderShortcutsUI(currentShortcuts);
-    switchSettingsTab('shortcuts');
-  });
-  tabAi?.addEventListener('click', () => {
-    recordingAction = null;
-    heldKeys.clear();
-    peakKeys.clear();
-    renderShortcutsUI(currentShortcuts);
-    switchSettingsTab('ai');
-  });
+  }
 
-  // Cancel shortcut recording if user clicks outside any recorder button
+  tabShortcuts?.addEventListener('click', () => { cancelRecording(); switchSettingsTab('shortcuts'); });
+  tabAi?.addEventListener('click', () => { cancelRecording(); switchSettingsTab('ai'); });
+  tabConfig?.addEventListener('click', () => { cancelRecording(); switchSettingsTab('config'); });
+
   document.addEventListener('click', (e) => {
     if (!recordingAction) return;
     const target = e.target as HTMLElement | null;
     if (!target?.closest('.shortcut-recorder')) {
-      recordingAction = null;
-      heldKeys.clear();
-      peakKeys.clear();
-      renderShortcutsUI(currentShortcuts);
+      cancelRecording();
     }
   });
 
@@ -272,11 +266,7 @@ function init() {
       const action = btn.dataset.reset as ShortcutActionId | undefined;
       if (!action) return;
       recordingAction = null;
-      const next: CustomShortcutsConfig = {
-        ...currentShortcuts,
-        [action]: DEFAULT_CUSTOM_SHORTCUTS[action],
-      };
-      await saveShortcuts(next, 'Reset to default');
+      await saveShortcuts({ ...currentShortcuts, [action]: DEFAULT_CUSTOM_SHORTCUTS[action] }, 'Reset to default');
     });
   });
 
@@ -297,22 +287,80 @@ function init() {
     chrome.tabs.create({ url: 'chrome://extensions/shortcuts' });
   });
 
+  chrome.storage.local.remove('inspectMode');
+
+  // 1. Check MCP Status
+  chrome.runtime.sendMessage({ type: 'GET_MCP_STATUS' }, (res) => {
+    updateMcpStatus(res?.connected ?? false);
+  });
+
+  chrome.runtime.onMessage.addListener((msg) => {
+    if (msg.type === 'MCP_STATUS_CHANGED') {
+      updateMcpStatus(msg.connected ?? false);
+    }
+  });
+
+  const statusPollInterval = setInterval(() => {
+    chrome.runtime.sendMessage({ type: 'GET_MCP_STATUS' }, (res) => {
+      updateMcpStatus(res?.connected ?? false);
+    });
+  }, 1500);
+
+  window.addEventListener('unload', () => clearInterval(statusPollInterval));
+
+  statusBadge?.addEventListener('click', () => {
+    if (statusText) statusText.innerText = 'Connecting...';
+    chrome.runtime.sendMessage({ type: 'GET_MCP_STATUS' }, (res) => {
+      updateMcpStatus(res?.connected ?? false);
+    });
+  });
+
+  function updateMcpStatus(connected: boolean) {
+    if (!statusBadge || !statusText) return;
+    if (connected) {
+      statusBadge.className = 'status-badge connected';
+      statusText.innerText = 'Connected';
+    } else {
+      statusBadge.className = 'status-badge disconnected';
+      statusText.innerText = 'Offline';
+    }
+  }
+
+  // 2. Navigation & Dynamic Island
+  const setIslandOpen = (open: boolean) => {
+    if (!screenshotIsland || !btnScreenshotToggle) return;
+    screenshotIsland.classList.toggle('open', open);
+    screenshotIsland.setAttribute('aria-hidden', String(!open));
+    btnScreenshotToggle.setAttribute('aria-expanded', String(open));
+  };
+
+  btnScreenshotToggle?.addEventListener('click', (e) => {
+    e.stopPropagation();
+    setIslandOpen(!(screenshotIsland?.classList.contains('open') ?? false));
+  });
+
+  btnIslandClose?.addEventListener('click', (e) => {
+    e.stopPropagation();
+    setIslandOpen(false);
+  });
+
+  document.addEventListener('click', (e) => {
+    if (!screenshotIsland?.classList.contains('open')) return;
+    const target = e.target as Node;
+    if (!screenshotIsland.contains(target) && !btnScreenshotToggle?.contains(target)) {
+      setIslandOpen(false);
+    }
+  });
+
   document.addEventListener('keydown', (e) => {
     if (recordingAction) {
       e.preventDefault();
       e.stopPropagation();
-
       if (e.repeat) return;
-
       if (e.key === 'Escape') {
-        recordingAction = null;
-        heldKeys.clear();
-        peakKeys.clear();
-        renderShortcutsUI(currentShortcuts);
+        cancelRecording();
         return;
       }
-
-      // Sync modifier state to prevent stuck modifiers
       if (!e.ctrlKey) heldKeys.delete('Ctrl');
       if (!e.altKey) heldKeys.delete('Alt');
       if (!e.shiftKey) heldKeys.delete('Shift');
@@ -320,14 +368,11 @@ function init() {
 
       const token = normalizeKeyToken(e);
       if (!token) return;
-
       heldKeys.add(token);
       peakKeys.add(token);
 
       const activeBtn = recorderButtons.find((b) => b.dataset.action === recordingAction);
-      if (activeBtn) {
-        activeBtn.innerText = formatChordPreview(peakKeys);
-      }
+      if (activeBtn) activeBtn.innerText = formatChordPreview(peakKeys);
       return;
     }
 
@@ -342,11 +387,8 @@ function init() {
     e.stopPropagation();
 
     const token = normalizeKeyToken(e);
-    if (token) {
-      heldKeys.delete(token);
-    }
+    if (token) heldKeys.delete(token);
 
-    // Finalize chord once all held keys are released
     if (heldKeys.size === 0 && peakKeys.size > 0) {
       const combo = formatChordFromSet(peakKeys);
       const targetAction = recordingAction;
@@ -360,7 +402,7 @@ function init() {
         return;
       }
 
-      const conflict = (['inspect', 'pickAudit', 'pickAi', 'screenshot'] as ShortcutActionId[]).find(
+      const conflict = (['inspect', 'pickAi', 'screenshot'] as ShortcutActionId[]).find(
         (id) => id !== targetAction && currentShortcuts[id] === combo
       );
       if (conflict) {
@@ -373,14 +415,7 @@ function init() {
     }
   }, true);
 
-  window.addEventListener('blur', () => {
-    if (recordingAction) {
-      recordingAction = null;
-      heldKeys.clear();
-      peakKeys.clear();
-      renderShortcutsUI(currentShortcuts);
-    }
-  });
+  window.addEventListener('blur', cancelRecording);
 
   btnTabSettings?.addEventListener('click', () => {
     setIslandOpen(false);
@@ -407,7 +442,7 @@ function init() {
       selectModel.innerHTML = '';
     }
     if (modelFetchStatus) {
-      modelFetchStatus.innerText = 'Auto-detect with button above or type manually';
+      modelFetchStatus.innerText = 'Load from provider or type manually';
     }
 
     if (p === 'custom') {
@@ -445,38 +480,27 @@ function init() {
 
     try {
       const headers: Record<string, string> = {};
-      if (key) {
-        headers['Authorization'] = `Bearer ${key}`;
-      }
+      if (key) headers['Authorization'] = `Bearer ${key}`;
 
       const proxyRes: { ok: boolean; status: number; text?: string; error?: string } = await chrome.runtime.sendMessage({
         type: 'PROXY_HTTP_GET',
         payload: { url: modelsUrl, headers },
       });
 
-      if (!proxyRes) {
-        throw new Error('Background proxy service is unavailable.');
-      }
-
-      if (!proxyRes.ok) {
-        throw new Error(proxyRes.error || `HTTP ${proxyRes.status}: ${proxyRes.text}`);
-      }
+      if (!proxyRes) throw new Error('Background proxy service is unavailable.');
+      if (!proxyRes.ok) throw new Error(proxyRes.error || `HTTP ${proxyRes.status}: ${proxyRes.text}`);
 
       const rawTxt = proxyRes.text || '';
       if (rawTxt.trim().startsWith('<')) {
-        throw new Error('Endpoint returned HTML page instead of JSON. Ensure Base URL is correct and starts with https://');
+        throw new Error('Endpoint returned HTML page instead of JSON. Ensure Base URL starts with https://');
       }
 
       const json = JSON.parse(rawTxt);
       const rawList: any[] = json.data || json.models || (Array.isArray(json) ? json : []);
-
-      if (rawList.length === 0) {
-        throw new Error('No models found in response.');
-      }
+      if (rawList.length === 0) throw new Error('No models found in response.');
 
       const modelIds: string[] = rawList.map((m) => (typeof m === 'string' ? m : m.id || m.name)).filter(Boolean);
 
-      // Populate select dropdown
       selectModel.innerHTML = '<option value="">-- Choose Loaded Model --</option>';
       modelIds.forEach((id) => {
         const opt = document.createElement('option');
@@ -491,19 +515,13 @@ function init() {
       }
 
       selectModel.onchange = () => {
-        if (selectModel.value) {
-          inputModel.value = selectModel.value;
-        }
+        if (selectModel.value) inputModel.value = selectModel.value;
       };
 
-      if (modelFetchStatus) {
-        modelFetchStatus.innerText = `Loaded ${modelIds.length} models!`;
-      }
+      if (modelFetchStatus) modelFetchStatus.innerText = `Loaded ${modelIds.length} models!`;
     } catch (err: any) {
       console.warn('[LetMe] Failed to fetch models:', err);
-      if (modelFetchStatus) {
-        modelFetchStatus.innerText = `Fetch failed: ${err.message}. You can still type manually.`;
-      }
+      if (modelFetchStatus) modelFetchStatus.innerText = `Fetch failed: ${err.message}`;
     } finally {
       btnFetchModels.disabled = false;
     }
@@ -512,18 +530,11 @@ function init() {
   // 5. Load & Save Settings
   function loadSettings() {
     chrome.storage.local.get(['aiProvider', 'aiBaseUrl', 'aiApiKey', 'aiModel']).then((data) => {
-      let p = data.aiProvider || 'openrouter';
+      const p = data.aiProvider || 'openrouter';
       let baseUrl = data.aiBaseUrl || '';
 
-      // Auto-fix protocol if missing
       if (baseUrl && !/^https?:\/\//i.test(baseUrl)) {
         baseUrl = (baseUrl.startsWith('localhost') || baseUrl.startsWith('127.0.0.1')) ? `http://${baseUrl}` : `https://${baseUrl}`;
-        chrome.storage.local.set({ aiBaseUrl: baseUrl });
-      }
-
-      // If user accidentally entered their web app port 28120 without /v1, clean it up
-      if (baseUrl.includes(':28120') && !baseUrl.includes('/v1')) {
-        baseUrl = PROVIDER_PRESETS[p]?.baseUrl || 'https://openrouter.ai/api/v1';
         chrome.storage.local.set({ aiBaseUrl: baseUrl });
       }
 
@@ -577,11 +588,6 @@ function init() {
       finalBaseUrl = (finalBaseUrl.startsWith('localhost') || finalBaseUrl.startsWith('127.0.0.1')) ? `http://${finalBaseUrl}` : `https://${finalBaseUrl}`;
     }
 
-    if (finalBaseUrl.includes(':28120') && !finalBaseUrl.includes('/v1')) {
-      alert('Cannot save localhost:28120 without /v1 as AI Base URL.\n\nPort 28120 is your Alpakyros web app. The OpenAI-compatible API path is http://localhost:28120/v1');
-      return;
-    }
-
     await chrome.storage.local.set({
       aiProvider: p,
       aiBaseUrl: finalBaseUrl || 'https://openrouter.ai/api/v1',
@@ -590,7 +596,7 @@ function init() {
     });
 
     if (settingsStatus) {
-      settingsStatus.innerText = 'Settings saved successfully!';
+      settingsStatus.innerText = 'AI settings saved!';
       setTimeout(() => {
         if (settingsStatus) settingsStatus.innerText = '';
       }, 2000);
@@ -612,7 +618,7 @@ function init() {
       url.startsWith('about:');
 
     if (isRestrictedUrl) {
-      [btnStartInspect, btnScreenshotToggle, btnShotArea, btnShotFull, btnMultiPick, btnAutoBug].forEach((btn) => {
+      [btnStartInspect, btnScreenshotToggle, btnShotArea, btnShotFull, btnAutoBug].forEach((btn) => {
         if (btn) {
           (btn as HTMLButtonElement).disabled = true;
           btn.style.opacity = '0.4';
@@ -635,7 +641,7 @@ function init() {
               window.close();
             }, 100);
           } catch {
-            alert('Please refresh this webpage once to enable LetMe Inspector.');
+            alert('Please refresh this webpage once to enable LetMe Pick Studio.');
           }
           return;
         }
@@ -643,51 +649,17 @@ function init() {
       });
     }
 
-    // Manual Inspector (Always Manual!)
-    btnStartInspect?.addEventListener('click', () => {
-      sendTabMessageWithInjection('START_INSPECT');
-    });
+    btnStartInspect?.addEventListener('click', () => sendTabMessageWithInjection('START_INSPECT'));
+    btnShotArea?.addEventListener('click', () => sendTabMessageWithInjection('START_SCREENSHOT_AREA'));
+    btnShotFull?.addEventListener('click', () => sendTabMessageWithInjection('START_SCREENSHOT_FULL'));
 
-    // Multi-Element Stager
-    btnMultiPick?.addEventListener('click', () => {
-      sendTabMessageWithInjection('START_MULTI_PICK');
-    });
-
-    // Screenshots
-    btnShotArea?.addEventListener('click', () => {
-      sendTabMessageWithInjection('START_SCREENSHOT_AREA');
-    });
-
-    btnShotFull?.addEventListener('click', () => {
-      sendTabMessageWithInjection('START_SCREENSHOT_FULL');
-    });
-
-    // AI Vision Bug Detection (Explicit, with pre-check)
     btnAutoBug?.addEventListener('click', async () => {
-      const data = await chrome.storage.local.get(['aiProvider', 'aiApiKey', 'aiBaseUrl']);
+      const data = await chrome.storage.local.get(['aiProvider', 'aiApiKey']);
       const p = data.aiProvider || 'openrouter';
       const key = data.aiApiKey;
-      const baseUrl = data.aiBaseUrl || '';
-
-      if (baseUrl.includes(':28120')) {
-        alert(
-          'Invalid AI Vision Base URL:\n\n' +
-          'Your AI Base URL is set to "http://localhost:28120", which is your local web app (Alpakyros), NOT an AI Vision LLM endpoint.\n\n' +
-          'Switching to Settings tab now so you can select a real provider (e.g. Gemini, OpenRouter, or OpenAI).'
-        );
-        viewActions?.classList.remove('active');
-        viewSettings?.classList.add('active');
-        switchSettingsTab('ai');
-        loadSettings();
-        return;
-      }
 
       if (!key && p !== 'ollama') {
-        alert(
-          'API Key Required:\n\n' +
-          'AI Vision Auto Bug Detection requires an API Key.\n\n' +
-          'Switching to Settings tab now so you can enter your API Key.'
-        );
+        alert('API Key Required:\n\nAI Vision Auto Bug Detection requires an API Key.\n\nSwitching to Settings → AI Vision now.');
         viewActions?.classList.remove('active');
         viewSettings?.classList.add('active');
         switchSettingsTab('ai');

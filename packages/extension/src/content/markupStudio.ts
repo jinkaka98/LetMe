@@ -31,6 +31,8 @@ export class MarkupStudio {
   private canvas: HTMLCanvasElement;
   private ctx: CanvasRenderingContext2D;
   private annotations: MarkupAnnotation[] = [];
+  private undoStack: MarkupAnnotation[][] = [];
+  private redoStack: MarkupAnnotation[][] = [];
   private currentTool: MarkupTool = 'pen';
   private currentColor: string = '#ffffff';
   private currentStrokeWidth: number = 2;
@@ -94,8 +96,16 @@ export class MarkupStudio {
     };
   }
 
+  private pushHistory() {
+    this.undoStack.push(this.annotations.map((a) => this.cloneAnnotation(a)));
+    if (this.undoStack.length > 40) this.undoStack.shift();
+    this.redoStack = [];
+  }
+
   setAnnotations(list: MarkupAnnotation[]) {
     this.annotations = list.map((a) => this.cloneAnnotation(a));
+    this.undoStack = [];
+    this.redoStack = [];
     this.selectedId = null;
     this.hoveredEraseId = null;
     this.redraw();
@@ -136,13 +146,31 @@ export class MarkupStudio {
   }
 
   undo() {
-    this.annotations.pop();
+    if (this.annotations.length === 0 && this.undoStack.length === 0) return;
+    if (this.undoStack.length > 0) {
+      this.redoStack.push(this.annotations.map((a) => this.cloneAnnotation(a)));
+      this.annotations = this.undoStack.pop()!;
+    } else {
+      const removed = this.annotations.pop();
+      if (removed) this.redoStack.push([removed]);
+    }
+    this.selectedId = null;
+    this.redraw();
+    this.emitChange();
+  }
+
+  redo() {
+    if (this.redoStack.length === 0) return;
+    this.undoStack.push(this.annotations.map((a) => this.cloneAnnotation(a)));
+    this.annotations = this.redoStack.pop()!;
     this.selectedId = null;
     this.redraw();
     this.emitChange();
   }
 
   clear() {
+    if (this.annotations.length === 0) return;
+    this.pushHistory();
     this.annotations = [];
     this.selectedId = null;
     this.hoveredEraseId = null;
@@ -298,6 +326,7 @@ export class MarkupStudio {
     if (this.currentTool === 'eraser') {
       const hit = this.findAnnotationAt(pt);
       if (hit) {
+        this.pushHistory();
         this.annotations = this.annotations.filter((a) => a.id !== hit.id);
         this.hoveredEraseId = null;
         this.redraw();
@@ -312,6 +341,7 @@ export class MarkupStudio {
         if (sel) {
           const handle = this.hitTestHandles(pt, sel);
           if (handle) {
+            this.pushHistory();
             this.activeHandle = handle;
             this.lastDragPt = pt;
             this.initialBBox = this.getAnnotationBBox(sel);
@@ -324,6 +354,7 @@ export class MarkupStudio {
 
       const hit = this.findAnnotationAt(pt);
       if (hit) {
+        this.pushHistory();
         this.selectedId = hit.id;
         this.activeHandle = 'move';
         this.lastDragPt = pt;
@@ -399,6 +430,7 @@ export class MarkupStudio {
       committed = true;
       const val = input.value.trim();
       if (val) {
+        this.pushHistory();
         this.annotations.push({
           id: `ann_text_${Date.now()}`,
           type: 'text',
@@ -586,6 +618,7 @@ export class MarkupStudio {
         };
       }
 
+      this.pushHistory();
       this.annotations.push(this.currentAnnotation);
       this.currentAnnotation = null;
       this.redraw();

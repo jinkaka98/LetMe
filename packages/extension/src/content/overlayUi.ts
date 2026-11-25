@@ -11,13 +11,13 @@ export type LayerTag = 'bug' | 'design' | 'edit' | 'note';
 export type StudioTool = 'idle' | 'pick' | 'hand' | Exclude<MarkupTool, 'select'>;
 export type ShapeToolId = 'box' | 'rounded-box' | 'circle' | 'diamond' | 'triangle' | 'callout';
 
-export const FONT_OPTIONS: { label: string; value: string }[] = [
-  { label: 'Montserrat', value: '"Montserrat", "Segoe UI", sans-serif' },
-  { label: 'Poppins', value: '"Poppins", "Segoe UI", sans-serif' },
-  { label: 'Calibri', value: 'Calibri, "Segoe UI", sans-serif' },
-  { label: 'Arial', value: 'Arial, Helvetica, sans-serif' },
-  { label: '4-Bit', value: '"Press Start 2P", "Courier New", monospace' },
-];
+export interface CopyHistoryItem {
+  id: string;
+  timestamp: number;
+  layerCount: number;
+  summary: string;
+  text: string;
+}
 
 export interface PickedLayer {
   id: string;
@@ -47,18 +47,27 @@ export interface StudioViewState {
   isPropsOpen: boolean;
   isToolbarCollapsed: boolean;
   showAllPins: boolean;
+  isFinalNotesOpen: boolean;
   openModal: 'shapes' | 'color' | 'raw' | null;
   rawPreviewText: string;
-  isMcpPanelOpen: boolean;
+  finalInstructions: string;
+  isRightSliderOpen: boolean;
+  rightSliderTab: 'mcp' | 'history';
   mcpSnapshots: McpSnapshotSummary[];
+  copyHistory: CopyHistoryItem[];
 }
 
 export interface OverlayCallbacks {
   onSelectLayer: (layerId: string) => void;
+  onOpenLayerRaw: (layerId: string) => void;
+  onOpenFullRaw: () => void;
   onDeleteLayer: (layerId: string) => void;
+  onClearAllLayers: () => void;
   onToggleLayerVisible: (layerId: string) => void;
   onUpdateLayerTag: (layerId: string, tag: LayerTag) => void;
   onUpdateLayerNote: (layerId: string, note: string) => void;
+  onToggleFinalNotes: () => void;
+  onUpdateFinalInstructions: (text: string) => void;
   onCloseProps: () => void;
   onSetTool: (tool: StudioTool) => void;
   onSelectShape: (shape: ShapeToolId) => void;
@@ -67,18 +76,30 @@ export interface OverlayCallbacks {
   onSetFontFamily: (font: string) => void;
   onToggleModal: (modal: 'shapes' | 'color' | 'raw' | null) => void;
   onUndo: () => void;
+  onRedo: () => void;
   onClearMarkup: () => void;
   onToggleMultiPick: () => void;
   onToggleDrawer: () => void;
   onToggleToolbar: () => void;
   onToggleAllPins: () => void;
-  onToggleMcpPanel: () => void;
+  onToggleRightSlider: () => void;
+  onSwitchRightTab: (tab: 'mcp' | 'history') => void;
   onRefreshMcpSnapshots: () => void;
   onDeleteMcpSnapshot: (id: string) => void;
+  onRecopyHistoryItem: (id: string) => void;
+  onDeleteHistoryItem: (id: string) => void;
   onCopyPrompt: () => void;
   onSendToAi: () => void;
   onClose: () => void;
 }
+
+export const FONT_OPTIONS: { label: string; value: string }[] = [
+  { label: 'Montserrat', value: '"Montserrat", "Segoe UI", sans-serif' },
+  { label: 'Poppins', value: '"Poppins", "Segoe UI", sans-serif' },
+  { label: 'Calibri', value: 'Calibri, "Segoe UI", sans-serif' },
+  { label: 'Arial', value: 'Arial, Helvetica, sans-serif' },
+  { label: '4-Bit', value: '"Press Start 2P", "Courier New", monospace' },
+];
 
 const COLOR_PRESETS = [
   '#ffffff', '#a1a1aa', '#ef4444', '#f97316',
@@ -87,6 +108,10 @@ const COLOR_PRESETS = [
 
 const HAND_SVG = `<svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 11V6a2 2 0 0 0-2-2a2 2 0 0 0-2 2"/><path d="M14 10V4a2 2 0 0 0-2-2a2 2 0 0 0-2 2v2"/><path d="M10 10.5V6a2 2 0 0 0-2-2a2 2 0 0 0-2 2v8"/><path d="M18 8a2 2 0 1 1 4 0v6a8 8 0 0 1-8 8h-2c-2.8 0-4.5-.86-5.99-2.34l-3.6-3.6a2 2 0 0 1 2.83-2.82L7 15"/></svg>`;
 const ERASER_SVG = `<svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m7 21-4.3-4.3c-1-1-1-2.5 0-3.4l9.6-9.6c1-1 2.5-1 3.4 0l5.6 5.6c1 1 1 2.5 0 3.4L13 21"/><path d="M22 21H7"/><path d="m5 11 9 9"/></svg>`;
+const REDO_SVG = `<svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 14 20 9l-5-5"/><path d="M20 9H9.5A5.5 5.5 0 0 0 4 14.5A5.5 5.5 0 0 0 9.5 20H13"/></svg>`;
+const EYE_SVG = `<svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2.062 12.348a1 1 0 0 1 0-.696 10.75 10.75 0 0 1 19.876 0 1 1 0 0 1 0 .696 10.75 10.75 0 0 1-19.876 0"/><circle cx="12" cy="12" r="3"/></svg>`;
+const LOCK_CENSOR_SVG = `<svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="11" x="3" y="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>`;
+const EXIT_SVG = `<svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" x2="9" y1="12" y2="12"/></svg>`;
 const SIDEBAR_RIGHT_SVG = `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="3" rx="3"/><path d="M15 3v18"/></svg>`;
 const CIRCLE_SVG = `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/></svg>`;
 const ROUNDED_BOX_SVG = `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="5"/></svg>`;
@@ -125,18 +150,18 @@ const HUD_CSS = `
   }
   .hud-menu-btn:hover, .hud-menu-btn.active { background: #ffffff; color: #000000; border-color: #ffffff; }
 
-  .hud-mcp-toggle {
+  .hud-right-toggle {
     position: fixed; top: 16px; right: 16px; z-index: 2147483647;
     height: 38px; padding: 0 10px; border-radius: 9px;
     display: inline-flex; align-items: center; justify-content: center; gap: 6px;
     cursor: pointer; font-size: 11px; font-weight: 700;
   }
-  .hud-mcp-toggle:hover { border-color: #ffffff; }
+  .hud-right-toggle:hover { border-color: #ffffff; }
 
   .hud-toolbar {
     position: fixed; top: 16px; left: 50%; transform: translateX(-50%); z-index: 2147483647;
-    display: inline-flex; align-items: center; gap: 3px; padding: 4px 6px; border-radius: 10px;
-    max-width: calc(100vw - 170px);
+    display: inline-flex; align-items: center; gap: 2px; padding: 4px 6px; border-radius: 10px;
+    max-width: calc(100vw - 140px); overflow-x: auto;
   }
   .hud-toolbar-collapsed {
     position: fixed; top: 16px; left: 50%; transform: translateX(-50%); z-index: 2147483647;
@@ -147,7 +172,7 @@ const HUD_CSS = `
   .hud-toolbar-collapsed img { width: 18px; height: 18px; border-radius: 4px; display: block; }
 
   .tb-btn {
-    position: relative; width: 32px; height: 32px; border-radius: 7px;
+    position: relative; width: 30px; height: 30px; border-radius: 7px;
     border: 1px solid transparent; background: transparent; color: #d4d4d8;
     cursor: pointer; display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0;
   }
@@ -155,34 +180,34 @@ const HUD_CSS = `
   .tb-btn.active { background: #ffffff; color: #000000; border-color: #ffffff; }
   .tb-btn.danger:hover { border-color: #ef4444; color: #ef4444; }
   .tb-key {
-    position: absolute; bottom: 2px; right: 3px; font-size: 8px; font-weight: 700;
+    position: absolute; bottom: 1px; right: 2px; font-size: 8px; font-weight: 700;
     font-family: ui-monospace, SFMono-Regular, Menlo, monospace; opacity: 0.72; line-height: 1;
   }
   .tb-sep { width: 1px; height: 20px; background: #27272a; margin: 0 3px; flex-shrink: 0; }
 
   .color-trigger {
-    width: 22px; height: 22px; border-radius: 9999px; border: 2px solid #ffffff;
+    width: 20px; height: 20px; border-radius: 9999px; border: 2px solid #ffffff;
     cursor: pointer; margin: 0 3px; flex-shrink: 0;
   }
   .px-stepper {
     display: inline-flex; align-items: center; gap: 2px; padding: 2px 4px;
-    border: 1px solid #3f3f46; border-radius: 6px; background: #050505;
+    border: 1px solid #3f3f46; border-radius: 6px; background: #050505; flex-shrink: 0;
   }
   .px-val {
     font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-    font-size: 10px; font-weight: 700; color: #ffffff; min-width: 26px; text-align: center;
+    font-size: 10px; font-weight: 700; color: #ffffff; min-width: 24px; text-align: center;
   }
   .px-arrows { display: flex; flex-direction: column; gap: 1px; }
   .px-arr-btn {
-    width: 14px; height: 11px; border: none; background: #18181b; color: #d4d4d8;
-    font-size: 8px; line-height: 1; cursor: pointer; border-radius: 2px;
+    width: 14px; height: 10px; border: none; background: #18181b; color: #d4d4d8;
+    font-size: 7px; line-height: 1; cursor: pointer; border-radius: 2px;
     display: flex; align-items: center; justify-content: center; padding: 0;
   }
   .px-arr-btn:hover { background: #ffffff; color: #000000; }
   .font-select {
     background: #050505; border: 1px solid #3f3f46; border-radius: 6px;
     color: #ffffff; font-size: 10px; font-weight: 600; padding: 4px 6px;
-    outline: none; cursor: pointer; max-width: 96px;
+    outline: none; cursor: pointer; max-width: 92px; flex-shrink: 0;
   }
   .font-select:focus { border-color: #ffffff; }
 
@@ -229,27 +254,25 @@ const HUD_CSS = `
   /* Left Layers Drawer */
   .hud-drawer {
     position: fixed; top: 62px; left: 16px; z-index: 2147483647;
-    width: 344px; max-height: calc(100vh - 132px); border-radius: 10px;
+    width: 356px; max-height: calc(100vh - 84px); border-radius: 10px;
     display: flex; flex-direction: column; overflow: hidden; font-size: 12px;
   }
   .drawer-head {
     padding: 9px 12px; background: #050505; border-bottom: 1px dashed #2e2e32;
     display: flex; align-items: center; justify-content: space-between; gap: 6px;
   }
+  .brand-wrap { display: flex; align-items: center; gap: 6px; }
+  .brand-logo { width: 18px; height: 18px; border-radius: 4px; display: block; }
   .brand-title { font-weight: 700; font-size: 12px; color: #ffffff; }
-  .mcp-pill {
-    display: inline-flex; align-items: center; gap: 4px; padding: 2px 6px;
-    border-radius: 9999px; border: 1px solid #3f3f46; background: #0a0a0c;
-    font-size: 9px; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; color: #d4d4d8;
-  }
-  .mcp-dot { width: 6px; height: 6px; border-radius: 50%; border: 1px solid #71717a; }
-  .mcp-dot.on { background: #ffffff; border-color: #ffffff; box-shadow: 0 0 6px rgba(255,255,255,0.8); }
   .toggle-chip {
     background: #121215; border: 1px solid #3f3f46; color: #fafafa; border-radius: 4px;
-    padding: 2px 7px; font-size: 10px; font-weight: 600; cursor: pointer;
+    padding: 3px 7px; font-size: 10px; font-weight: 600; cursor: pointer;
     font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    display: inline-flex; align-items: center; justify-content: center; gap: 4px;
   }
+  .toggle-chip:hover { border-color: #ffffff; }
   .toggle-chip.active { background: #ffffff; color: #000000; border-color: #ffffff; }
+  .toggle-chip.danger:hover { border-color: #ef4444; color: #ef4444; }
   .drawer-body { padding: 10px 12px; overflow-y: auto; display: flex; flex-direction: column; gap: 8px; flex: 1; }
   .section-head {
     display: flex; align-items: center; justify-content: space-between; font-size: 10px; font-weight: 700;
@@ -259,7 +282,7 @@ const HUD_CSS = `
   .layers-box { border: 1px solid #2e2e32; border-radius: 6px; background: rgba(5,5,5,0.9); overflow: hidden; }
   .layers-empty { padding: 16px 12px; text-align: center; color: #71717a; font-size: 11px; }
   .layer-row {
-    display: flex; align-items: center; gap: 7px; padding: 6px 8px;
+    display: flex; align-items: center; gap: 6px; padding: 6px 8px;
     border-bottom: 1px solid #18181b; cursor: pointer;
   }
   .layer-row:last-child { border-bottom: none; }
@@ -268,7 +291,7 @@ const HUD_CSS = `
   .layer-eye { background: none; border: none; color: #a1a1aa; cursor: pointer; padding: 2px; display: inline-flex; flex-shrink: 0; }
   .layer-eye.off { opacity: 0.35; }
   .layer-thumb {
-    width: 42px; height: 28px; border-radius: 4px; border: 1px solid #3f3f46; background: #000000;
+    width: 40px; height: 26px; border-radius: 4px; border: 1px solid #3f3f46; background: #000000;
     overflow: hidden; flex-shrink: 0; display: flex; align-items: center; justify-content: center;
     font-size: 9px; color: #71717a; font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
   }
@@ -291,13 +314,31 @@ const HUD_CSS = `
     font-size: 8px; font-weight: 700; text-transform: uppercase; padding: 1px 4px;
     border-radius: 3px; border: 1px solid #3f3f46; background: #050505; color: #d4d4d8;
   }
-  .layer-del { background: none; border: none; color: #71717a; cursor: pointer; font-size: 14px; padding: 0 3px; }
-  .layer-del:hover { color: #ffffff; }
+  .layer-raw-btn {
+    background: #121215; border: 1px solid #2e2e32; color: #d4d4d8; border-radius: 3px;
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 9px; font-weight: 700;
+    padding: 2px 5px; cursor: pointer; flex-shrink: 0;
+  }
+  .layer-raw-btn:hover { background: #ffffff; color: #000000; border-color: #ffffff; }
+  .layer-trash {
+    background: none; border: none; color: #71717a; cursor: pointer; padding: 3px;
+    display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0; border-radius: 4px;
+  }
+  .layer-trash:hover { color: #ef4444; background: #18181b; }
+
+  .final-notes-wrap { border-top: 1px dashed #2e2e32; padding-top: 8px; display: flex; flex-direction: column; gap: 6px; }
+  .final-toggle-btn {
+    width: 100%; background: #050505; border: 1px solid #2e2e32; color: #d4d4d8; border-radius: 5px;
+    padding: 5px 8px; font-size: 10px; font-weight: 700; cursor: pointer;
+    display: flex; align-items: center; justify-content: space-between;
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  }
+  .final-toggle-btn:hover { border-color: #ffffff; color: #ffffff; }
 
   /* Side-by-Side Properties Modal */
   .hud-props-modal {
-    position: fixed; top: 62px; left: 368px; z-index: 2147483647;
-    width: 300px; max-height: calc(100vh - 132px); border-radius: 10px;
+    position: fixed; top: 62px; left: 380px; z-index: 2147483647;
+    width: 300px; max-height: calc(100vh - 84px); border-radius: 10px;
     display: flex; flex-direction: column; overflow: hidden; font-size: 12px;
   }
   .props-body { padding: 10px 12px; overflow-y: auto; display: flex; flex-direction: column; gap: 9px; }
@@ -316,7 +357,7 @@ const HUD_CSS = `
   }
   .tag-pill.active { background: #ffffff; color: #000000; border-color: #ffffff; }
   .note-input {
-    width: 100%; min-height: 64px; background: #050505; border: 1px solid #2e2e32;
+    width: 100%; min-height: 60px; background: #050505; border: 1px solid #2e2e32;
     border-radius: 5px; color: #fafafa; padding: 6px 8px; font-size: 11px; resize: vertical; outline: none;
   }
   .note-input:focus { border-color: #ffffff; }
@@ -324,39 +365,67 @@ const HUD_CSS = `
   /* Raw Preview Modal */
   .raw-modal {
     position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); z-index: 2147483647;
-    width: 460px; max-width: 92vw; max-height: 75vh; border-radius: 10px;
+    width: 480px; max-width: 92vw; max-height: 78vh; border-radius: 10px;
     display: flex; flex-direction: column; overflow: hidden;
   }
   .raw-pre {
     margin: 0; padding: 12px; background: #050505; color: #e4e4e7; font-size: 11px;
     font-family: ui-monospace, SFMono-Regular, Menlo, monospace; white-space: pre-wrap;
-    word-break: break-word; overflow-y: auto; max-height: 55vh;
+    word-break: break-word; overflow-y: auto; max-height: 58vh;
   }
 
-  /* Full-Height Right MCP Sidebar */
-  .hud-mcp-sidebar {
-    position: fixed; top: 16px; right: 16px; bottom: 64px; z-index: 2147483647;
-    width: 316px; border-radius: 12px; display: flex; flex-direction: column; overflow: hidden;
+  /* Full-Height Right Slider */
+  .hud-right-slider {
+    position: fixed; top: 16px; right: 16px; bottom: 16px; z-index: 2147483647;
+    width: 324px; border-radius: 12px; display: flex; flex-direction: column; overflow: hidden;
   }
-  .mcp-sb-head {
+  .rs-head {
     padding: 10px 12px; background: #050505; border-bottom: 1px dashed #2e2e32;
     display: flex; align-items: center; justify-content: space-between;
   }
+  .rs-output-box {
+    padding: 10px 12px; background: #0a0a0c; border-bottom: 1px solid #27272a;
+    display: flex; flex-direction: column; gap: 7px;
+  }
+  .rs-output-row { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+  .rs-btn-sec {
+    padding: 7px 10px; background: #121215; border: 1px solid #3f3f46; border-radius: 6px;
+    color: #fafafa; font-size: 11px; font-weight: 600; cursor: pointer;
+    display: inline-flex; align-items: center; justify-content: center; gap: 5px;
+  }
+  .rs-btn-sec:hover { border-color: #ffffff; }
+  .rs-btn-pri {
+    padding: 7px 10px; background: #ffffff; border: 1px solid #ffffff; border-radius: 6px;
+    color: #000000; font-size: 11px; font-weight: 700; cursor: pointer;
+    display: inline-flex; align-items: center; justify-content: center; gap: 5px;
+  }
+  .rs-btn-pri:hover { background: #e4e4e7; }
+  .rs-btn-exit {
+    padding: 6px 10px; background: #050505; border: 1px solid #3f3f46; border-radius: 6px;
+    color: #fca5a5; font-size: 11px; font-weight: 600; cursor: pointer;
+    display: inline-flex; align-items: center; justify-content: center; gap: 5px;
+  }
+  .rs-btn-exit:hover { border-color: #ef4444; background: #18181b; color: #ffffff; }
+
+  .rs-tabs-bar {
+    padding: 8px 12px 0; display: flex; align-items: center; justify-content: space-between; gap: 6px;
+  }
   .mcp-sb-tabs {
-    display: inline-flex; background: #121215; border: 1px solid #2e2e32; border-radius: 8px; padding: 2px; gap: 2px;
+    display: inline-flex; background: #121215; border: 1px solid #2e2e32; border-radius: 7px; padding: 2px; gap: 2px; flex: 1;
   }
   .mcp-sb-tab {
-    padding: 4px 9px; border-radius: 6px; border: none; background: transparent; color: #a1a1aa;
-    font-size: 10px; font-weight: 700; cursor: pointer;
+    flex: 1; padding: 5px 8px; border-radius: 5px; border: none; background: transparent; color: #a1a1aa;
+    font-size: 10px; font-weight: 700; cursor: pointer; text-align: center;
   }
   .mcp-sb-tab.active { background: #ffffff; color: #000000; }
+
   .mcp-sb-empty {
     flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center;
     text-align: center; padding: 24px; gap: 8px; color: #a1a1aa;
   }
-  .mcp-sb-empty h4 { margin: 0; font-size: 14px; color: #ffffff; }
+  .mcp-sb-empty h4 { margin: 0; font-size: 13px; color: #ffffff; }
   .mcp-sb-empty p { margin: 0; font-size: 11px; color: #71717a; line-height: 1.4; }
-  .mcp-item { padding: 9px 10px; border-bottom: 1px solid #18181b; display: flex; flex-direction: column; gap: 4px; }
+  .mcp-item { padding: 8px 10px; border-bottom: 1px solid #18181b; display: flex; flex-direction: column; gap: 4px; }
   .mcp-item:last-child { border-bottom: none; }
   .mcp-item-top { display: flex; align-items: center; justify-content: space-between; gap: 6px; }
   .mcp-item-sel {
@@ -364,42 +433,6 @@ const HUD_CSS = `
     overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1;
   }
   .mcp-item-note { font-size: 10px; color: #a1a1aa; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-
-  /* Bottom Pills */
-  .hud-bottom-left {
-    position: fixed; bottom: 16px; left: 16px; z-index: 2147483647;
-    display: inline-flex; align-items: center; gap: 8px;
-  }
-  .hud-pill-group { display: inline-flex; align-items: center; border-radius: 9px; padding: 3px 4px; gap: 2px; }
-  .pill-item-btn {
-    background: transparent; border: none; color: #e4e4e7; padding: 5px 8px; border-radius: 6px;
-    font-size: 11px; font-weight: 600; cursor: pointer; display: inline-flex; align-items: center; gap: 5px;
-    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-  }
-  .pill-item-btn:hover { background: #18181b; color: #ffffff; }
-  .pill-item-btn.active { background: #ffffff; color: #000000; }
-
-  .hud-bottom-right {
-    position: fixed; bottom: 16px; right: 16px; z-index: 2147483647;
-    display: inline-flex; align-items: center; gap: 6px; padding: 4px 6px; border-radius: 10px;
-  }
-  .act-sec {
-    padding: 6px 9px; background: #121215; border: 1px solid #3f3f46; border-radius: 6px;
-    color: #fafafa; font-size: 11px; font-weight: 600; cursor: pointer;
-    display: inline-flex; align-items: center; gap: 4px;
-  }
-  .act-sec:hover { border-color: #ffffff; }
-  .act-pri {
-    padding: 6px 12px; background: #ffffff; border: 1px solid #ffffff; border-radius: 6px;
-    color: #000000; font-size: 11px; font-weight: 700; cursor: pointer;
-    display: inline-flex; align-items: center; gap: 4px;
-  }
-  .act-pri:hover { background: #e4e4e7; }
-  .act-close {
-    width: 28px; height: 28px; border-radius: 6px; background: #121215; border: 1px solid #3f3f46;
-    color: #d4d4d8; font-size: 14px; cursor: pointer; display: inline-flex; align-items: center; justify-content: center;
-  }
-  .act-close:hover { background: #ffffff; color: #000000; border-color: #ffffff; }
 `;
 
 export class OverlayUi {
@@ -462,7 +495,7 @@ export class OverlayUi {
             ${getLucideSvg('type', { size: 15 })}<span class="tb-key">T</span>
           </button>
           <button class="tb-btn ${state.activeTool === 'blur' ? 'active' : ''}" data-tool="blur" title="Censored Blur (U)">
-            ${getLucideSvg('eye-off', { size: 15 })}<span class="tb-key">U</span>
+            ${LOCK_CENSOR_SVG}<span class="tb-key">U</span>
           </button>
           <div class="tb-sep"></div>
           <button id="btn-color-modal" class="color-trigger" style="background:${state.activeColor};" title="Pick Color"></button>
@@ -477,13 +510,17 @@ export class OverlayUi {
             state.activeTool === 'text'
               ? `<select id="select-font-family" class="font-select" title="Text Font Style">
                   ${FONT_OPTIONS.map(
-                    (f) =>
-                      `<option value="${this.escapeHtml(f.value)}" ${state.activeFontFamily === f.value ? 'selected' : ''}>${f.label}</option>`
+                    (f) => `<option value="${this.escapeHtml(f.value)}" ${state.activeFontFamily === f.value ? 'selected' : ''}>${f.label}</option>`
                   ).join('')}
                 </select>`
               : ''
           }
           <div class="tb-sep"></div>
+          <button id="tb-toggle-pins" class="tb-btn ${state.showAllPins ? 'active' : ''}" title="Show/Hide All Layer Pins">
+            ${EYE_SVG}
+          </button>
+          <button id="tb-undo" class="tb-btn" title="Undo">${getLucideSvg('undo-2', { size: 15 })}</button>
+          <button id="tb-redo" class="tb-btn" title="Redo">${REDO_SVG}</button>
           <button class="tb-btn danger ${state.activeTool === 'eraser' ? 'active' : ''}" data-tool="eraser" title="Eraser: Click markup to delete (E)">
             ${ERASER_SVG}<span class="tb-key">E</span>
           </button>
@@ -503,8 +540,7 @@ export class OverlayUi {
           <div class="pop-title"><span>Select Shape</span><button id="btn-close-modal" class="close-sym">${getLucideSvg('x', { size: 12 })}</button></div>
           <div class="shapes-grid">
             ${SHAPE_OPTIONS.map(
-              (s) =>
-                `<button class="shape-opt ${state.activeShape === s.id ? 'active' : ''}" data-shape="${s.id}" title="${s.title}">${s.icon}</button>`
+              (s) => `<button class="shape-opt ${state.activeShape === s.id ? 'active' : ''}" data-shape="${s.id}" title="${s.title}">${s.icon}</button>`
             ).join('')}
           </div>
         </div>
@@ -515,8 +551,7 @@ export class OverlayUi {
           <div class="pop-title"><span>Color Picker</span><button id="btn-close-modal" class="close-sym">${getLucideSvg('x', { size: 12 })}</button></div>
           <div class="color-grid">
             ${COLOR_PRESETS.map(
-              (c) =>
-                `<button class="color-cell ${state.activeColor.toLowerCase() === c ? 'active' : ''}" data-color="${c}" style="background:${c};"></button>`
+              (c) => `<button class="color-cell ${state.activeColor.toLowerCase() === c ? 'active' : ''}" data-color="${c}" style="background:${c};"></button>`
             ).join('')}
           </div>
           <div class="color-custom-row">
@@ -550,7 +585,7 @@ export class OverlayUi {
               return `
                 <div class="layer-row ${isActive ? 'active' : ''}" data-layer-id="${layer.id}">
                   <button class="layer-eye ${layer.visible ? '' : 'off'}" data-eye-id="${layer.id}" title="Toggle Pin">
-                    ${getLucideSvg('eye-off', { size: 12 })}
+                    ${EYE_SVG}
                   </button>
                   <div class="layer-thumb">${thumbHtml}</div>
                   <div class="layer-info">
@@ -564,7 +599,8 @@ export class OverlayUi {
                       <span>· ${layer.annotations.length} mark</span>
                     </div>
                   </div>
-                  <button class="layer-del" data-del-id="${layer.id}" title="Remove Layer">×</button>
+                  <button class="layer-raw-btn" data-raw-id="${layer.id}" title="Preview Raw for Layer #${layer.index}">Raw</button>
+                  <button class="layer-trash" data-del-id="${layer.id}" title="Delete Layer">${getLucideSvg('trash-2', { size: 13 })}</button>
                 </div>
               `;
             })
@@ -574,13 +610,14 @@ export class OverlayUi {
       ? `
         <aside class="hud-card hud-drawer">
           <div class="drawer-head">
-            <div style="display:flex; align-items:center; gap:6px;">
+            <div class="brand-wrap">
+              <img class="brand-logo" src="${logoUrl}" alt="LetMe" />
               <span class="brand-title">LetMe Inspector</span>
-              <span class="mcp-pill"><span class="mcp-dot ${this.mcpConnected ? 'on' : ''}"></span><span>${this.mcpConnected ? 'MCP' : 'Offline'}</span></span>
             </div>
-            <div style="display:flex; gap:4px;">
-              <button id="btn-raw-preview" class="toggle-chip" title="Preview Raw Prompt">Raw</button>
+            <div style="display:flex; gap:4px; align-items:center;">
+              <button id="btn-full-raw" class="toggle-chip" title="Preview Full Prompt">Raw</button>
               <button id="btn-drawer-multi" class="toggle-chip ${state.multiPick ? 'active' : ''}">${state.multiPick ? 'Multi' : 'Single'}</button>
+              <button id="btn-clear-all-layers" class="toggle-chip danger" title="Clear All Layers">${getLucideSvg('trash-2', { size: 12 })}</button>
             </div>
           </div>
           <div class="drawer-body">
@@ -589,6 +626,17 @@ export class OverlayUi {
               <span>Click layer to edit</span>
             </div>
             <div class="layers-box">${layersHtml}</div>
+            <div class="final-notes-wrap">
+              <button id="btn-toggle-final-notes" class="final-toggle-btn">
+                <span>Additional Final Instructions</span>
+                <span>${state.isFinalNotesOpen ? '▴' : '▾'}</span>
+              </button>
+              ${
+                state.isFinalNotesOpen
+                  ? `<textarea id="final-instructions-input" class="note-input" style="min-height:48px;" placeholder="Instruksi tambahan di akhir prompt (opsional)...">${this.escapeHtml(state.finalInstructions)}</textarea>`
+                  : ''
+              }
+            </div>
           </div>
         </aside>
       `
@@ -623,48 +671,71 @@ export class OverlayUi {
       `
         : '';
 
-    const rightMcpHtml = state.isMcpPanelOpen
-      ? `
-        <aside class="hud-card hud-mcp-sidebar">
-          <div class="mcp-sb-head">
-            <div class="mcp-sb-tabs">
-              <button class="mcp-sb-tab active">MCP (${state.mcpSnapshots.length})</button>
-              <button id="btn-mcp-refresh" class="mcp-sb-tab">Refresh</button>
-            </div>
-            <button id="btn-mcp-close" class="close-sym" title="Close MCP Sidebar">${getLucideSvg('x', { size: 12 })}</button>
-          </div>
-          ${
-            state.mcpSnapshots.length === 0
-              ? `
-                <div class="mcp-sb-empty">
-                  <h4>No items added yet...</h4>
-                  <p>Pick elements on the page and click <b>Send to AI</b> to inspect what is stored in MCP.</p>
-                </div>
-              `
-              : `
-                <div class="drawer-body">
-                  <div class="layers-box">
-                    ${state.mcpSnapshots
-                      .map(
-                        (s) => `
-                        <div class="mcp-item">
-                          <div class="mcp-item-top">
-                            <span class="mcp-item-sel">&lt;${s.tagName}&gt; ${this.escapeHtml(s.selector)}</span>
-                            <button class="layer-del" data-mcp-del="${s.id}" title="Delete from MCP">×</button>
-                          </div>
-                          <div class="mcp-item-note">${this.escapeHtml(s.userInstructions || s.userBugNotes || 'No note')}</div>
-                        </div>
-                      `
-                      )
-                      .join('')}
+    const rightTabBody =
+      state.rightSliderTab === 'mcp'
+        ? state.mcpSnapshots.length === 0
+          ? `<div class="mcp-sb-empty"><h4>No MCP data sent yet...</h4><p>Click <b>Send to AI</b> above to dispatch layers to MCP.</p></div>`
+          : `<div class="drawer-body"><div class="layers-box">
+              ${state.mcpSnapshots
+                .map(
+                  (s) => `
+                  <div class="mcp-item">
+                    <div class="mcp-item-top">
+                      <span class="mcp-item-sel">&lt;${s.tagName}&gt; ${this.escapeHtml(s.selector)}</span>
+                      <button class="layer-trash" data-mcp-del="${s.id}" title="Delete from MCP">${getLucideSvg('trash-2', { size: 12 })}</button>
+                    </div>
+                    <div class="mcp-item-note">${this.escapeHtml(s.userInstructions || s.userBugNotes || 'No note')}</div>
                   </div>
-                </div>
-              `
-          }
+                `
+                )
+                .join('')}
+            </div></div>`
+        : state.copyHistory.length === 0
+          ? `<div class="mcp-sb-empty"><h4>No copy history yet...</h4><p>Click <b>Copy</b> above to generate and save a structured prompt.</p></div>`
+          : `<div class="drawer-body"><div class="layers-box">
+              ${state.copyHistory
+                .map(
+                  (h) => `
+                  <div class="mcp-item">
+                    <div class="mcp-item-top">
+                      <span class="mcp-item-sel">${h.layerCount} Layer(s) · ${new Date(h.timestamp).toLocaleTimeString()}</span>
+                      <button class="layer-raw-btn" data-hist-copy="${h.id}" title="Copy Again">Copy</button>
+                      <button class="layer-trash" data-hist-del="${h.id}" title="Delete">${getLucideSvg('trash-2', { size: 12 })}</button>
+                    </div>
+                    <div class="mcp-item-note">${this.escapeHtml(h.summary)}</div>
+                  </div>
+                `
+                )
+                .join('')}
+            </div></div>`;
+
+    const rightSliderHtml = state.isRightSliderOpen
+      ? `
+        <aside class="hud-card hud-right-slider">
+          <div class="rs-head">
+            <span class="brand-title">Right Slider · ${this.mcpConnected ? 'MCP Online' : 'MCP Offline'}</span>
+            <button id="btn-rs-close" class="close-sym" title="Hide Right Slider">${getLucideSvg('x', { size: 12 })}</button>
+          </div>
+          <div class="rs-output-box">
+            <div class="section-head"><span>Output</span><span>${state.layers.length} Layer(s)</span></div>
+            <div class="rs-output-row">
+              <button id="btn-copy" class="rs-btn-sec">${getLucideSvg('copy', { size: 12 })} Copy</button>
+              <button id="btn-send" class="rs-btn-pri">${getLucideSvg('zap', { size: 12, color: '#000000' })} Send to AI</button>
+            </div>
+            <button id="btn-close-studio" class="rs-btn-exit">${EXIT_SVG} Close Inspector Studio</button>
+          </div>
+          <div class="rs-tabs-bar">
+            <div class="mcp-sb-tabs">
+              <button id="tab-rs-mcp" class="mcp-sb-tab ${state.rightSliderTab === 'mcp' ? 'active' : ''}">MCP (${state.mcpSnapshots.length})</button>
+              <button id="tab-rs-history" class="mcp-sb-tab ${state.rightSliderTab === 'history' ? 'active' : ''}">Copy (${state.copyHistory.length})</button>
+            </div>
+            ${state.rightSliderTab === 'mcp' ? `<button id="btn-mcp-refresh" class="toggle-chip" title="Refresh MCP">↻</button>` : ''}
+          </div>
+          ${rightTabBody}
         </aside>
       `
       : `
-        <button id="btn-mcp-panel" class="hud-card hud-mcp-toggle" title="Open MCP Storage Sidebar">
+        <button id="btn-right-slider" class="hud-card hud-right-toggle" title="Right Slider">
           ${SIDEBAR_RIGHT_SVG}
           ${state.mcpSnapshots.length > 0 ? `<span>${state.mcpSnapshots.length}</span>` : ''}
         </button>
@@ -679,22 +750,7 @@ export class OverlayUi {
       ${modalHtml}
       ${drawerHtml}
       ${propsModalHtml}
-      ${rightMcpHtml}
-      <div class="hud-bottom-left">
-        <div class="hud-card hud-pill-group">
-          <button id="btn-layers-pill" class="pill-item-btn ${state.isDrawerOpen ? 'active' : ''}">${state.layers.length} Layer${state.layers.length === 1 ? '' : 's'}</button>
-          <button id="btn-toggle-pins" class="pill-item-btn ${state.showAllPins ? '' : 'active'}" title="Show/Hide All Pins">${getLucideSvg('eye-off', { size: 13 })}</button>
-        </div>
-        <div class="hud-card hud-pill-group">
-          <button id="btn-undo" class="pill-item-btn" title="Undo">${getLucideSvg('undo-2', { size: 13 })}</button>
-          <button id="btn-clear" class="pill-item-btn" title="Clear All">${getLucideSvg('trash-2', { size: 13 })}</button>
-        </div>
-      </div>
-      <div class="hud-card hud-bottom-right">
-        <button id="btn-copy" class="act-sec">${getLucideSvg('copy', { size: 12 })} Copy</button>
-        <button id="btn-send" class="act-pri">${getLucideSvg('zap', { size: 12, color: '#000000' })} Send to AI</button>
-        <button id="btn-close" class="act-close" title="Close">×</button>
-      </div>
+      ${rightSliderHtml}
     `;
 
     this.bindEvents(state);
@@ -704,28 +760,31 @@ export class OverlayUi {
     if (!this.shadow) return;
 
     this.shadow.getElementById('btn-hud-menu')?.addEventListener('click', () => this.callbacks.onToggleDrawer());
-    this.shadow.getElementById('btn-layers-pill')?.addEventListener('click', () => this.callbacks.onToggleDrawer());
-    this.shadow.getElementById('btn-toggle-pins')?.addEventListener('click', () => this.callbacks.onToggleAllPins());
+    this.shadow.getElementById('tb-toggle-pins')?.addEventListener('click', () => this.callbacks.onToggleAllPins());
     this.shadow.getElementById('btn-lock-multi')?.addEventListener('click', () => this.callbacks.onToggleMultiPick());
     this.shadow.getElementById('btn-drawer-multi')?.addEventListener('click', () => this.callbacks.onToggleMultiPick());
+    this.shadow.getElementById('btn-clear-all-layers')?.addEventListener('click', () => this.callbacks.onClearAllLayers());
+    this.shadow.getElementById('btn-full-raw')?.addEventListener('click', () => this.callbacks.onOpenFullRaw());
+    this.shadow.getElementById('btn-toggle-final-notes')?.addEventListener('click', () => this.callbacks.onToggleFinalNotes());
     this.shadow.getElementById('btn-collapse-tb')?.addEventListener('click', () => this.callbacks.onToggleToolbar());
     this.shadow.getElementById('btn-expand-tb')?.addEventListener('click', () => this.callbacks.onToggleToolbar());
     this.shadow.getElementById('btn-px-up')?.addEventListener('click', () => this.callbacks.onSetStrokeWidth(state.activeStrokeWidth + 1));
     this.shadow.getElementById('btn-px-down')?.addEventListener('click', () => this.callbacks.onSetStrokeWidth(state.activeStrokeWidth - 1));
     this.shadow.getElementById('btn-shapes-modal')?.addEventListener('click', () => this.callbacks.onToggleModal(state.openModal === 'shapes' ? null : 'shapes'));
     this.shadow.getElementById('btn-color-modal')?.addEventListener('click', () => this.callbacks.onToggleModal(state.openModal === 'color' ? null : 'color'));
-    this.shadow.getElementById('btn-raw-preview')?.addEventListener('click', () => this.callbacks.onToggleModal(state.openModal === 'raw' ? null : 'raw'));
     this.shadow.getElementById('btn-close-modal')?.addEventListener('click', () => this.callbacks.onToggleModal(null));
     this.shadow.getElementById('btn-close-props')?.addEventListener('click', () => this.callbacks.onCloseProps());
-    this.shadow.getElementById('btn-undo')?.addEventListener('click', () => this.callbacks.onUndo());
-    this.shadow.getElementById('btn-clear')?.addEventListener('click', () => this.callbacks.onClearMarkup());
+    this.shadow.getElementById('tb-undo')?.addEventListener('click', () => this.callbacks.onUndo());
+    this.shadow.getElementById('tb-redo')?.addEventListener('click', () => this.callbacks.onRedo());
     this.shadow.getElementById('tb-clear-all')?.addEventListener('click', () => this.callbacks.onClearMarkup());
-    this.shadow.getElementById('btn-mcp-panel')?.addEventListener('click', () => this.callbacks.onToggleMcpPanel());
-    this.shadow.getElementById('btn-mcp-close')?.addEventListener('click', () => this.callbacks.onToggleMcpPanel());
+    this.shadow.getElementById('btn-right-slider')?.addEventListener('click', () => this.callbacks.onToggleRightSlider());
+    this.shadow.getElementById('btn-rs-close')?.addEventListener('click', () => this.callbacks.onToggleRightSlider());
+    this.shadow.getElementById('tab-rs-mcp')?.addEventListener('click', () => this.callbacks.onSwitchRightTab('mcp'));
+    this.shadow.getElementById('tab-rs-history')?.addEventListener('click', () => this.callbacks.onSwitchRightTab('history'));
     this.shadow.getElementById('btn-mcp-refresh')?.addEventListener('click', () => this.callbacks.onRefreshMcpSnapshots());
     this.shadow.getElementById('btn-copy')?.addEventListener('click', () => this.callbacks.onCopyPrompt());
     this.shadow.getElementById('btn-send')?.addEventListener('click', () => this.callbacks.onSendToAi());
-    this.shadow.getElementById('btn-close')?.addEventListener('click', () => this.callbacks.onClose());
+    this.shadow.getElementById('btn-close-studio')?.addEventListener('click', () => this.callbacks.onClose());
 
     this.shadow.querySelectorAll<HTMLButtonElement>('[data-tool]').forEach((btn) => {
       btn.addEventListener('click', () => {
@@ -757,9 +816,7 @@ export class OverlayUi {
     const hexInput = this.shadow.getElementById('input-hex-color') as HTMLInputElement | null;
     hexInput?.addEventListener('input', () => {
       const val = hexInput.value.trim();
-      if (/^#[0-9a-fA-F]{6}$/.test(val)) {
-        this.callbacks.onSetColor(val);
-      }
+      if (/^#[0-9a-fA-F]{6}$/.test(val)) this.callbacks.onSetColor(val);
     });
 
     this.shadow.querySelectorAll<HTMLButtonElement>('[data-mcp-del]').forEach((btn) => {
@@ -769,12 +826,34 @@ export class OverlayUi {
       });
     });
 
+    this.shadow.querySelectorAll<HTMLButtonElement>('[data-hist-copy]').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        const id = btn.dataset.histCopy;
+        if (id) this.callbacks.onRecopyHistoryItem(id);
+      });
+    });
+
+    this.shadow.querySelectorAll<HTMLButtonElement>('[data-hist-del]').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        const id = btn.dataset.histDel;
+        if (id) this.callbacks.onDeleteHistoryItem(id);
+      });
+    });
+
     this.shadow.querySelectorAll<HTMLElement>('[data-layer-id]').forEach((row) => {
       row.addEventListener('click', (e) => {
         const target = e.target as HTMLElement;
-        if (target.closest('[data-eye-id]') || target.closest('[data-del-id]')) return;
+        if (target.closest('[data-eye-id]') || target.closest('[data-del-id]') || target.closest('[data-raw-id]')) return;
         const id = row.dataset.layerId;
         if (id) this.callbacks.onSelectLayer(id);
+      });
+    });
+
+    this.shadow.querySelectorAll<HTMLButtonElement>('[data-raw-id]').forEach((btn) => {
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const id = btn.dataset.rawId;
+        if (id) this.callbacks.onOpenLayerRaw(id);
       });
     });
 
@@ -811,15 +890,18 @@ export class OverlayUi {
       const id = activeRow?.dataset.layerId;
       if (id) this.callbacks.onUpdateLayerNote(id, noteEl.value);
     });
+
+    const finalInput = this.shadow.getElementById('final-instructions-input') as HTMLTextAreaElement | null;
+    finalInput?.addEventListener('input', () => {
+      this.callbacks.onUpdateFinalInstructions(finalInput.value);
+    });
   }
 
   private startStatusSync() {
     const applyStatus = (connected: boolean) => {
       this.mcpConnected = connected;
-      const dot = this.shadow?.querySelector('.mcp-dot');
-      const txt = this.shadow?.querySelector('.mcp-pill span:last-child') as HTMLElement | null;
-      if (dot) dot.classList.toggle('on', connected);
-      if (txt) txt.innerText = connected ? 'MCP' : 'Offline';
+      const rsTitle = this.shadow?.querySelector('.hud-right-slider .brand-title') as HTMLElement | null;
+      if (rsTitle) rsTitle.innerText = `Right Slider · ${connected ? 'MCP Online' : 'MCP Offline'}`;
     };
 
     chrome.runtime.sendMessage({ type: 'GET_MCP_STATUS' }, (res) => applyStatus(res?.connected ?? false));

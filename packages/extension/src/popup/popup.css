@@ -461,9 +461,10 @@ body {
 }
 
 /* Settings Sub-Tabs & Shortcuts */
-.settings-tabs {
+.settings-tabs,
+.settings-tabs-3 {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: repeat(3, 1fr);
   gap: 4px;
   padding: 3px;
   background: #0a0a0c;
@@ -641,7 +642,86 @@ body {
 }
 
 .settings-form {
-  gap: 10px;
+  gap: 8px;
+}
+
+.ai-section-card {
+  background: #050505;
+  border: 1px solid #27272a;
+  border-radius: 6px;
+  padding: 9px 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.field-row-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.btn-save-ai {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 8px 12px;
+  background: #ffffff;
+  border: 1px solid #ffffff;
+  border-radius: 6px;
+  color: #000000;
+  font-weight: 700;
+  font-size: 11px;
+  cursor: pointer;
+  transition: background-color 0.15s;
+}
+
+.btn-save-ai:hover {
+  background: #e4e4e7;
+}
+
+.port-row {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+
+.port-row input {
+  flex: 1;
+}
+
+.btn-apply-port {
+  padding: 6px 12px;
+  background: #121215;
+  border: 1px solid #3f3f46;
+  border-radius: 5px;
+  color: #ffffff;
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.btn-apply-port:hover {
+  background: #ffffff;
+  color: #000000;
+  border-color: #ffffff;
+}
+
+.config-pre {
+  background: #09090b;
+  border: 1px dashed #2e2e32;
+  border-radius: 5px;
+  padding: 8px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 9.5px;
+  color: #d4d4d8;
+  white-space: pre-wrap;
+  word-break: break-word;
+  max-height: 112px;
+  overflow-y: auto;
+  line-height: 1.4;
 }
 
 .field {

@@ -231,3 +231,72 @@ test('StateStore.deleteSnapshot removes snapshot and updates activeElement', () 
   assert.equal(store.getActiveElement()?.id, 'snap_del_1');
   assert.equal(store.deleteSnapshot('nonexistent'), false);
 });
+
+test('handleGetActiveElement renders multi-layer breakdown and globalInstructions', () => {
+  const baseBox = {
+    width: 120,
+    height: 40,
+    margin: { top: 0, right: 0, bottom: 0, left: 0 },
+    border: { top: 0, right: 0, bottom: 0, left: 0 },
+    padding: { top: 8, right: 12, bottom: 8, left: 12 },
+    content: { width: 96, height: 24 },
+    boundingBox: { x: 0, y: 0, top: 0, right: 120, bottom: 40, left: 0, width: 120, height: 40 },
+  };
+  const baseCtx = { parentTagName: 'div', parentSelector: '.wrap', display: 'flex', position: 'relative', isFlexChild: true, isGridChild: false };
+  const baseBugs = { hasHorizontalScrollLeak: false, isClippedByAncestor: false, hasZIndexConflict: false, zIndex: 'auto', warnings: [] };
+
+  const multiSnap: ElementSnapshot = {
+    id: 'snap_multi_1',
+    timestamp: Date.now(),
+    url: 'https://example.com',
+    pageTitle: 'Multi',
+    selector: '#btn-1',
+    tagName: 'button',
+    classNames: ['cta'],
+    outerHtmlSnippet: '<button id="btn-1">Save</button>',
+    boxModel: baseBox,
+    layoutContext: baseCtx,
+    layoutBugs: baseBugs,
+    computedStyles: { color: '#ffffff' },
+    annotations: [{ id: 'a1', type: 'text', text: 'Fix spacing', color: '#ef4444', strokeWidth: 2 }],
+    globalInstructions: 'Keep dark monochrome theme consistent.',
+    layers: [
+      {
+        index: 1,
+        tag: 'design',
+        selector: '#btn-1',
+        tagName: 'button',
+        note: 'Increase padding',
+        outerHtmlSnippet: '<button id="btn-1">Save</button>',
+        boxModel: baseBox,
+        layoutContext: baseCtx,
+        layoutBugs: baseBugs,
+        computedStyles: { padding: '8px 12px' },
+        annotations: [{ id: 'a1', type: 'text', text: 'Fix spacing', color: '#ef4444', strokeWidth: 2 }],
+      },
+      {
+        index: 2,
+        tag: 'bug',
+        selector: '.card-title',
+        tagName: 'h2',
+        note: 'Text overflows on mobile',
+        outerHtmlSnippet: '<h2 class="card-title">Title</h2>',
+        boxModel: baseBox,
+        layoutContext: baseCtx,
+        layoutBugs: baseBugs,
+        computedStyles: { 'font-size': '18px' },
+        annotations: [],
+      },
+    ],
+    viewport: { width: 1280, height: 720, devicePixelRatio: 1 },
+  };
+
+  globalStore.setActiveElement(multiSnap);
+  const res = handleGetActiveElement('snap_multi_1');
+  const txt = res.content[0].type === 'text' ? res.content[0].text : '';
+  assert.match(txt, /All Picked Layers \(2 Layers\)/);
+  assert.match(txt, /Layer #1 \[DESIGN\]/);
+  assert.match(txt, /Layer #2 \[BUG\]/);
+  assert.match(txt, /Additional Final Instructions/);
+  assert.match(txt, /Keep dark monochrome theme consistent/);
+});

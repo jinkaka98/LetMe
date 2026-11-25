@@ -1,7 +1,6 @@
 import { elementInspector } from './inspector.js';
 import { livePreviewManager } from './livePreview.js';
 import { screenshotTool } from './screenshotTool.js';
-import { multiPicker } from './multiPicker.js';
 import { autoBugDetector } from './autoBugDetector.js';
 import {
   ConsoleLogEntry,
@@ -85,19 +84,11 @@ window.addEventListener(
       lastTriggeredChord = combo;
       e.preventDefault();
       e.stopPropagation();
-      multiPicker.stop();
       elementInspector.toggle();
-    } else if (combo === activeShortcuts.pickAudit) {
-      lastTriggeredChord = combo;
-      e.preventDefault();
-      e.stopPropagation();
-      elementInspector.stop();
-      multiPicker.toggle();
     } else if (combo === activeShortcuts.pickAi) {
       lastTriggeredChord = combo;
       e.preventDefault();
       e.stopPropagation();
-      multiPicker.stop();
       elementInspector.stop();
       autoBugDetector.runDetection();
     } else if (combo === activeShortcuts.screenshot) {
@@ -105,7 +96,6 @@ window.addEventListener(
       e.preventDefault();
       e.stopPropagation();
       elementInspector.stop();
-      multiPicker.stop();
       if (activeShortcuts.screenshotMode === 'full') {
         screenshotTool.captureFullPage();
       } else {
@@ -121,14 +111,12 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
   switch (message.type) {
     case 'TOGGLE_INSPECTOR':
     case 'START_INSPECT': {
-      multiPicker.stop();
       elementInspector.toggle();
       sendResponse({ active: elementInspector.isInspecting() });
       return false;
     }
 
     case 'START_AUTO_BUG_DETECT': {
-      multiPicker.stop();
       elementInspector.stop();
       autoBugDetector.runDetection();
       sendResponse({ success: true });
@@ -137,7 +125,6 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
 
     case 'START_SCREENSHOT_AREA': {
       elementInspector.stop();
-      multiPicker.stop();
       screenshotTool.startAreaCapture();
       sendResponse({ success: true });
       return false;
@@ -145,15 +132,7 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
 
     case 'START_SCREENSHOT_FULL': {
       elementInspector.stop();
-      multiPicker.stop();
       screenshotTool.captureFullPage();
-      sendResponse({ success: true });
-      return false;
-    }
-
-    case 'START_MULTI_PICK': {
-      elementInspector.stop();
-      multiPicker.toggle();
       sendResponse({ success: true });
       return false;
     }

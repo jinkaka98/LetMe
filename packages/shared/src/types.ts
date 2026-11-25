@@ -104,6 +104,21 @@ export interface ConsoleLogEntry {
   stack?: string;
 }
 
+export interface LayerSnapshotDetail {
+  index: number;
+  tag: 'bug' | 'design' | 'edit' | 'note';
+  selector: string;
+  tagName: string;
+  note?: string;
+  outerHtmlSnippet: string;
+  innerTextSnippet?: string;
+  boxModel: BoxModelMetrics;
+  layoutContext: ContainerLayoutContext;
+  layoutBugs: LayoutBugReport;
+  computedStyles: Record<string, string>;
+  annotations: MarkupAnnotation[];
+}
+
 export interface ElementSnapshot {
   id: string;
   timestamp: number;
@@ -123,6 +138,8 @@ export interface ElementSnapshot {
   fullViewportScreenshotBase64?: string;
   userInstructions?: string;
   userBugNotes?: string;
+  globalInstructions?: string;
+  layers?: LayerSnapshotDetail[];
   annotations: MarkupAnnotation[];
   viewport: {
     width: number;
@@ -147,13 +164,11 @@ export interface LivePreviewResult {
 
 export type ShortcutActionId =
   | 'inspect'
-  | 'pickAudit'
   | 'pickAi'
   | 'screenshot';
 
 export interface CustomShortcutsConfig {
   inspect: string;
-  pickAudit: string;
   pickAi: string;
   screenshot: string;
   screenshotMode: 'area' | 'full';
@@ -161,7 +176,6 @@ export interface CustomShortcutsConfig {
 
 export const DEFAULT_CUSTOM_SHORTCUTS: CustomShortcutsConfig = {
   inspect: 'Alt+Shift+I',
-  pickAudit: 'Alt+Shift+P',
   pickAi: 'Alt+Shift+A',
   screenshot: 'Alt+Shift+S',
   screenshotMode: 'area',

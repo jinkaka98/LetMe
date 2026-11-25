@@ -1,5 +1,18 @@
 import { globalStore } from '../stateStore.js';
-import { ElementSnapshot } from '@letme/shared';
+import { ElementSnapshot, MarkupAnnotation } from '@letme/shared';
+
+function formatAnnotationDetail(ann: MarkupAnnotation, index: number): string {
+  const colorInfo = ann.color ? ` [${ann.color}]` : '';
+  const sizeInfo = ann.strokeWidth ? ` (${ann.strokeWidth}px)` : '';
+  const rotInfo = ann.rotation ? ` [rotated ${Math.round((ann.rotation * 180) / Math.PI)}°]` : '';
+  let detail = '';
+  if (ann.type === 'text') detail = `"${ann.text || ''}"`;
+  else if (ann.type === 'ruler') detail = `Measured ${ann.text || '0px'}`;
+  else if (ann.type === 'blur') detail = 'Censored / Redacted region';
+  else if (ann.text) detail = ann.text;
+  else detail = `${ann.type} visual marker`;
+  return `${index + 1}. **${ann.type.toUpperCase()}**${colorInfo}${sizeInfo}${rotInfo}: ${detail}`;
+}
 
 export function handleGetActiveElement(id?: string) {
   let element = globalStore.getActiveElement();
@@ -104,8 +117,43 @@ export function handleGetActiveElement(id?: string) {
   if (element.annotations && element.annotations.length > 0) {
     lines.push(`## ✏️ Visual Annotations on Screenshot:`);
     element.annotations.forEach((ann, i) => {
-      lines.push(`${i + 1}. **${ann.type.toUpperCase()}**: ${ann.text || (ann.type === 'box' ? 'Bug bounding box' : 'Arrow marker')}`);
+      lines.push(formatAnnotationDetail(ann, i));
     });
+    lines.push('');
+  }
+
+  // Multi-Layer Full Breakdown (when 2+ layers are staged)
+  if (element.layers && element.layers.length > 1) {
+    lines.push(`## 🧩 All Picked Layers (${element.layers.length} Layers):`);
+    for (const layer of element.layers) {
+      lines.push(`### Layer #${layer.index} [${layer.tag.toUpperCase()}]: \`<${layer.tagName}>\` \`${layer.selector}\``);
+      lines.push(`- **Focus / Note**: ${layer.note?.trim() || 'N/A'}`);
+      lines.push(`- **Size**: ${layer.boxModel.width}px × ${layer.boxModel.height}px (Pad: ${layer.boxModel.padding.top}/${layer.boxModel.padding.right}/${layer.boxModel.padding.bottom}/${layer.boxModel.padding.left}, Mar: ${layer.boxModel.margin.top}/${layer.boxModel.margin.right}/${layer.boxModel.margin.bottom}/${layer.boxModel.margin.left})`);
+      lines.push(`- **Parent**: \`${layer.layoutContext.parentTagName}\` (\`${layer.layoutContext.parentSelector}\`, display: \`${layer.layoutContext.display}\`)`);
+      if (layer.layoutBugs.warnings.length > 0) {
+        lines.push(`- **Layout Warnings**: ${layer.layoutBugs.warnings.join('; ')}`);
+      }
+      if (layer.annotations.length > 0) {
+        lines.push(`- **Layer Annotations (${layer.annotations.length})**:`);
+        layer.annotations.forEach((ann, idx) => {
+          lines.push(`  ${formatAnnotationDetail(ann, idx)}`);
+        });
+      }
+      lines.push('```html');
+      lines.push(layer.outerHtmlSnippet);
+      lines.push('```');
+      lines.push('```css');
+      for (const [prop, val] of Object.entries(layer.computedStyles)) {
+        lines.push(`${prop}: ${val};`);
+      }
+      lines.push('```');
+      lines.push('');
+    }
+  }
+
+  if (element.globalInstructions) {
+    lines.push(`## 📌 Additional Final Instructions:`);
+    lines.push(element.globalInstructions);
     lines.push('');
   }
 

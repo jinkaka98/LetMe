@@ -86,7 +86,6 @@ export function formatChordPreview(keys: Iterable<string>): string {
 export function mergeShortcutsConfig(raw?: Partial<CustomShortcutsConfig>): CustomShortcutsConfig {
   return {
     inspect: raw?.inspect || DEFAULT_CUSTOM_SHORTCUTS.inspect,
-    pickAudit: raw?.pickAudit || DEFAULT_CUSTOM_SHORTCUTS.pickAudit,
     pickAi: raw?.pickAi || DEFAULT_CUSTOM_SHORTCUTS.pickAi,
     screenshot: raw?.screenshot || DEFAULT_CUSTOM_SHORTCUTS.screenshot,
     screenshotMode: raw?.screenshotMode === 'full' ? 'full' : 'area',

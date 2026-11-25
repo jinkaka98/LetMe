@@ -43,7 +43,27 @@ class ExtensionBridgeService {
   private port: number = DEFAULT_WS_PORT;
 
   constructor() {
-    this.connect();
+    chrome.storage.local.get('mcpPort').then((data) => {
+      const p = Number(data.mcpPort);
+      if (Number.isInteger(p) && p > 0 && p <= 65535) {
+        this.port = p;
+      }
+      this.connect();
+    });
+
+    chrome.storage.onChanged.addListener((changes, areaName) => {
+      if (areaName === 'local' && changes.mcpPort) {
+        const nextPort = Number(changes.mcpPort.newValue) || DEFAULT_WS_PORT;
+        if (nextPort !== this.port && nextPort > 0 && nextPort <= 65535) {
+          this.port = nextPort;
+          if (this.ws) {
+            try { this.ws.close(); } catch {}
+            this.ws = null;
+          }
+          this.connect();
+        }
+      }
+    });
   }
 
   getIsConnected(): boolean {

@@ -7,8 +7,16 @@ import {
   getKeyComputedStyles,
 } from './layoutEngine.js';
 import { MarkupStudio } from './markupStudio.js';
-import { FONT_OPTIONS, LayerTag, OverlayUi, PickedLayer, ShapeToolId, StudioTool } from './overlayUi.js';
-import { ElementSnapshot, MarkupAnnotation, McpSnapshotSummary } from '@letme/shared';
+import {
+  CopyHistoryItem,
+  FONT_OPTIONS,
+  LayerTag,
+  OverlayUi,
+  PickedLayer,
+  ShapeToolId,
+  StudioTool,
+} from './overlayUi.js';
+import { ElementSnapshot, LayerSnapshotDetail, MarkupAnnotation, McpSnapshotSummary } from '@letme/shared';
 
 const TOOL_HOTKEYS: Record<string, StudioTool> = {
   h: 'hand',
@@ -44,9 +52,14 @@ export class ElementInspector {
   private isPropsOpen: boolean = false;
   private isToolbarCollapsed: boolean = false;
   private showAllPins: boolean = true;
+  private isFinalNotesOpen: boolean = false;
   private openModal: 'shapes' | 'color' | 'raw' | null = null;
-  private isMcpPanelOpen: boolean = false;
+  private rawPreviewText: string = '';
+  private finalInstructions: string = '';
+  private isRightSliderOpen: boolean = false;
+  private rightSliderTab: 'mcp' | 'history' = 'mcp';
   private mcpSnapshots: McpSnapshotSummary[] = [];
+  private copyHistory: CopyHistoryItem[] = [];
   private mcpListener: any = null;
 
   constructor() {
@@ -59,6 +72,16 @@ export class ElementInspector {
         this.syncPins();
         this.renderStudio();
       },
+      onOpenLayerRaw: (id) => {
+        this.rawPreviewText = this.buildLayerRawPreview(id);
+        this.openModal = 'raw';
+        this.renderStudio();
+      },
+      onOpenFullRaw: () => {
+        this.rawPreviewText = this.buildStructuredCopyPrompt() || 'No layers picked yet.';
+        this.openModal = 'raw';
+        this.renderStudio();
+      },
       onDeleteLayer: (id) => {
         this.layers = this.layers.filter((l) => l.id !== id);
         this.layers.forEach((l, idx) => {
@@ -69,6 +92,15 @@ export class ElementInspector {
           if (!this.activeLayerId) this.isPropsOpen = false;
           this.loadActiveLayerAnnotations();
         }
+        this.syncPins();
+        this.renderStudio();
+      },
+      onClearAllLayers: () => {
+        this.layers = [];
+        this.activeLayerId = null;
+        this.isPropsOpen = false;
+        this.globalAnnotations = [];
+        this.markupStudio?.setAnnotations([]);
         this.syncPins();
         this.renderStudio();
       },
@@ -91,6 +123,13 @@ export class ElementInspector {
       onUpdateLayerNote: (id, note: string) => {
         const layer = this.layers.find((l) => l.id === id);
         if (layer) layer.note = note;
+      },
+      onToggleFinalNotes: () => {
+        this.isFinalNotesOpen = !this.isFinalNotesOpen;
+        this.renderStudio();
+      },
+      onUpdateFinalInstructions: (text: string) => {
+        this.finalInstructions = text;
       },
       onCloseProps: () => {
         this.isPropsOpen = false;
@@ -122,6 +161,7 @@ export class ElementInspector {
         this.renderStudio();
       },
       onUndo: () => this.markupStudio?.undo(),
+      onRedo: () => this.markupStudio?.redo(),
       onClearMarkup: () => this.markupStudio?.clear(),
       onToggleMultiPick: () => {
         this.multiPick = !this.multiPick;
@@ -141,9 +181,13 @@ export class ElementInspector {
         this.syncPins();
         this.renderStudio();
       },
-      onToggleMcpPanel: () => {
-        this.isMcpPanelOpen = !this.isMcpPanelOpen;
-        if (this.isMcpPanelOpen) this.refreshMcpSnapshots();
+      onToggleRightSlider: () => {
+        this.isRightSliderOpen = !this.isRightSliderOpen;
+        if (this.isRightSliderOpen) this.refreshMcpSnapshots();
+        this.renderStudio();
+      },
+      onSwitchRightTab: (tab: 'mcp' | 'history') => {
+        this.rightSliderTab = tab;
         this.renderStudio();
       },
       onRefreshMcpSnapshots: () => this.refreshMcpSnapshots(),
@@ -154,6 +198,17 @@ export class ElementInspector {
             this.renderStudio();
           }
         });
+      },
+      onRecopyHistoryItem: (id: string) => {
+        const item = this.copyHistory.find((h) => h.id === id);
+        if (item) {
+          navigator.clipboard.writeText(item.text);
+          this.overlayUi?.showToast('Copied from history!');
+        }
+      },
+      onDeleteHistoryItem: (id: string) => {
+        this.copyHistory = this.copyHistory.filter((h) => h.id !== id);
+        this.renderStudio();
       },
       onCopyPrompt: () => this.handleCopyPrompt(),
       onSendToAi: () => this.handleSendToAi(),
@@ -184,8 +239,11 @@ export class ElementInspector {
     this.isPropsOpen = false;
     this.isToolbarCollapsed = false;
     this.showAllPins = true;
+    this.isFinalNotesOpen = false;
     this.openModal = null;
-    this.isMcpPanelOpen = false;
+    this.rawPreviewText = '';
+    this.finalInstructions = '';
+    this.isRightSliderOpen = false;
 
     this.createHoverElements();
     this.markupStudio?.destroy();
@@ -263,10 +321,14 @@ export class ElementInspector {
       isPropsOpen: this.isPropsOpen,
       isToolbarCollapsed: this.isToolbarCollapsed,
       showAllPins: this.showAllPins,
+      isFinalNotesOpen: this.isFinalNotesOpen,
       openModal: this.openModal,
-      rawPreviewText: this.buildRawPromptText(),
-      isMcpPanelOpen: this.isMcpPanelOpen,
+      rawPreviewText: this.rawPreviewText,
+      finalInstructions: this.finalInstructions,
+      isRightSliderOpen: this.isRightSliderOpen,
+      rightSliderTab: this.rightSliderTab,
       mcpSnapshots: this.mcpSnapshots,
+      copyHistory: this.copyHistory,
     });
   }
 
@@ -534,6 +596,79 @@ export class ElementInspector {
     this.captureLayerThumbnail(layer.id, rect);
   }
 
+  private formatAnnotationLine(ann: MarkupAnnotation, idx: number): string {
+    const color = ann.color ? ` [${ann.color}]` : '';
+    const stroke = ann.strokeWidth ? ` (${ann.strokeWidth}px)` : '';
+    const rot = ann.rotation ? ` [rotated ${Math.round((ann.rotation * 180) / Math.PI)}°]` : '';
+    const detail =
+      ann.type === 'text'
+        ? `"${ann.text || ''}"`
+        : ann.type === 'ruler'
+          ? `Measured ${ann.text || '0px'}`
+          : ann.type === 'blur'
+            ? 'Censored region'
+            : ann.text || `${ann.type} marker`;
+    return `  ${idx + 1}. **${ann.type.toUpperCase()}**${color}${stroke}${rot}: ${detail}`;
+  }
+
+  private buildLayerDetailSnapshot(layer: PickedLayer): LayerSnapshotDetail {
+    const el = layer.element;
+    return {
+      index: layer.index,
+      tag: layer.tag,
+      selector: layer.selector,
+      tagName: layer.tagName,
+      note: layer.note.trim() || undefined,
+      outerHtmlSnippet: getCleanHtmlSnippet(el),
+      innerTextSnippet: el.innerText?.substring(0, 300) || undefined,
+      boxModel: getBoxModel(el),
+      layoutContext: getContainerContext(el),
+      layoutBugs: diagnoseLayoutBugs(el),
+      computedStyles: getKeyComputedStyles(el),
+      annotations: layer.annotations,
+    };
+  }
+
+  private formatLayerPromptSection(detail: LayerSnapshotDetail): string {
+    const bm = detail.boxModel;
+    const ctx = detail.layoutContext;
+    const lines: string[] = [
+      `## Layer #${detail.index} — Focus: [${detail.tag.toUpperCase()}] \`<${detail.tagName}>\` \`${detail.selector}\``,
+      `- **User Instruction / Note**: ${detail.note || '(no specific note)'}`,
+      `- **Box Model**: ${bm.width}×${bm.height}px | Margin: ${bm.margin.top}/${bm.margin.right}/${bm.margin.bottom}/${bm.margin.left} | Padding: ${bm.padding.top}/${bm.padding.right}/${bm.padding.bottom}/${bm.padding.left}`,
+      `- **Parent Context**: \`${ctx.parentTagName}\` (\`${ctx.parentSelector}\`, display: \`${ctx.display}\`, position: \`${ctx.position}\`)`,
+    ];
+
+    if (ctx.isFlexChild && ctx.flexParent) {
+      lines.push(`- **Flex Parent**: direction=\`${ctx.flexParent.flexDirection}\`, justify=\`${ctx.flexParent.justifyContent}\`, align=\`${ctx.flexParent.alignItems}\`, gap=\`${ctx.flexParent.gap}\``);
+    }
+    if (ctx.isGridChild && ctx.gridParent) {
+      lines.push(`- **Grid Parent**: cols=\`${ctx.gridParent.gridTemplateColumns}\`, gap=\`${ctx.gridParent.gap}\``);
+    }
+    if (detail.layoutBugs.warnings.length > 0) {
+      lines.push(`- **Auto Layout Diagnostics**: ${detail.layoutBugs.warnings.join('; ')}`);
+    }
+    if (detail.annotations.length > 0) {
+      lines.push(`- **Visual Markups (${detail.annotations.length})**:`);
+      detail.annotations.forEach((ann, i) => lines.push(this.formatAnnotationLine(ann, i)));
+    }
+    lines.push('```html');
+    lines.push(detail.outerHtmlSnippet);
+    lines.push('```');
+    lines.push('```css');
+    for (const [prop, val] of Object.entries(detail.computedStyles)) {
+      lines.push(`${prop}: ${val};`);
+    }
+    lines.push('```');
+    return lines.join('\n');
+  }
+
+  private buildLayerRawPreview(layerId: string): string {
+    const layer = this.layers.find((l) => l.id === layerId);
+    if (!layer) return 'Layer not found.';
+    return this.formatLayerPromptSection(this.buildLayerDetailSnapshot(layer));
+  }
+
   private buildCombinedNotes(): { instructions: string; bugNotes: string } {
     const instructionLines: string[] = [];
     const bugLines: string[] = [];
@@ -555,17 +690,25 @@ export class ElementInspector {
     };
   }
 
-  private buildRawPromptText(): string {
+  private buildStructuredCopyPrompt(): string {
     if (this.layers.length === 0) return '';
-    const { instructions, bugNotes } = this.buildCombinedNotes();
-    return [
-      `### LetMe Inspector (${this.layers.length} Layer${this.layers.length > 1 ? 's' : ''})`,
-      `URL: ${window.location.href}`,
-      instructions ? `**Design / Edit / Notes:**\n${instructions}` : '',
-      bugNotes ? `**Bugs:**\n${bugNotes}` : '',
-    ]
-      .filter(Boolean)
-      .join('\n\n');
+    const sections = [
+      `# LetMe UI/UX Inspection Prompt`,
+      `- **Page**: ${document.title}`,
+      `- **URL**: ${window.location.href}`,
+      `- **Viewport**: ${window.innerWidth}×${window.innerHeight} (DPR ${window.devicePixelRatio || 1})`,
+      `- **Total Picked Layers**: ${this.layers.length}`,
+      '',
+      ...this.layers.map((l) => this.formatLayerPromptSection(this.buildLayerDetailSnapshot(l))),
+    ];
+
+    if (this.finalInstructions.trim()) {
+      sections.push('');
+      sections.push('## Additional Final Instructions');
+      sections.push(this.finalInstructions.trim());
+    }
+
+    return sections.join('\n');
   }
 
   private handleCopyPrompt() {
@@ -573,8 +716,19 @@ export class ElementInspector {
       this.overlayUi?.showToast('Pick at least 1 element first.', true);
       return;
     }
-    navigator.clipboard.writeText(this.buildRawPromptText());
-    this.overlayUi?.showToast('Prompt copied to clipboard!');
+    const promptText = this.buildStructuredCopyPrompt();
+    navigator.clipboard.writeText(promptText);
+    const summary = this.layers.map((l) => `#${l.index} <${l.tagName}> [${l.tag.toUpperCase()}]`).join(', ');
+    this.copyHistory.unshift({
+      id: `copy_${Date.now()}_${Math.random().toString(36).substring(2, 5)}`,
+      timestamp: Date.now(),
+      layerCount: this.layers.length,
+      summary,
+      text: promptText,
+    });
+    if (this.copyHistory.length > 20) this.copyHistory.pop();
+    this.renderStudio();
+    this.overlayUi?.showToast('Structured prompt copied to clipboard!');
   }
 
   private async handleSendToAi() {
@@ -607,6 +761,7 @@ export class ElementInspector {
 
       const { instructions, bugNotes } = this.buildCombinedNotes();
       const allAnnotations = this.layers.flatMap((l) => l.annotations);
+      const layerDetails = this.layers.map((l) => this.buildLayerDetailSnapshot(l));
 
       const snapshot: ElementSnapshot = {
         id: `snap_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
@@ -626,6 +781,8 @@ export class ElementInspector {
         screenshotBase64: annotatedScreenshotBase64,
         userInstructions: instructions || undefined,
         userBugNotes: bugNotes || undefined,
+        globalInstructions: this.finalInstructions.trim() || undefined,
+        layers: layerDetails,
         annotations: allAnnotations,
         viewport: {
           width: window.innerWidth,
