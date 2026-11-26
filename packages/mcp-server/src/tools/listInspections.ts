@@ -20,6 +20,10 @@ export function handleListInspections() {
       `### ${idx + 1}. <${snap.tagName.toLowerCase()}> \`${snap.selector}\``
     );
     lines.push(`- **ID**: ${snap.id}`);
+    lines.push(`- **Status**: \`${snap.status || 'pending'}\`${snap.resolutionNote ? ` (${snap.resolutionNote})` : ''}`);
+    if (snap.sourceContext?.componentName) {
+      lines.push(`- **Component**: \`${snap.sourceContext.componentName}\`${snap.sourceContext.filePath ? ` (${snap.sourceContext.filePath})` : ''}`);
+    }
     lines.push(`- **Page**: ${snap.pageTitle} (${snap.url})`);
     lines.push(`- **Size**: ${snap.boxModel.width}px × ${snap.boxModel.height}px`);
     if (snap.userInstructions) {

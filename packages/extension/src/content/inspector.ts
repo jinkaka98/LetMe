@@ -7,16 +7,29 @@ import {
   getKeyComputedStyles,
 } from './layoutEngine.js';
 import { MarkupStudio } from './markupStudio.js';
+import { screenshotTool } from './screenshotTool.js';
+import { ScrEditorModal, ScreenshotLayerItem } from './scrEditorModal.js';
+import { autoBugDetector } from './autoBugDetector.js';
 import {
   CopyHistoryItem,
   FONT_OPTIONS,
+  InspectorTab,
   LayerTag,
   OverlayUi,
   PickedLayer,
+  ScrCaptureMode,
+  ScrConfig,
   ShapeToolId,
   StudioTool,
 } from './overlayUi.js';
-import { ElementSnapshot, LayerSnapshotDetail, MarkupAnnotation, McpSnapshotSummary } from '@letme/shared';
+import {
+  ElementSnapshot,
+  LayerSnapshotDetail,
+  MarkupAnnotation,
+  McpSnapshotSummary,
+  SemanticAnchors,
+  SourceContextInfo,
+} from '@letme/shared';
 
 const TOOL_HOTKEYS: Record<string, StudioTool> = {
   h: 'hand',
@@ -58,6 +71,21 @@ export class ElementInspector {
   private finalInstructions: string = '';
   private isRightSliderOpen: boolean = false;
   private rightSliderTab: 'mcp' | 'history' = 'mcp';
+  private inspectorTab: InspectorTab = 'layers';
+  private scrConfig: ScrConfig = {
+    includeMarkup: true,
+    hideHud: true,
+    padding: 16,
+    format: 'png',
+    autoCopy: true,
+  };
+  private screenshots: ScreenshotLayerItem[] = [];
+  private scrEditor = new ScrEditorModal();
+  private aiSummary: { provider: string; model: string; hasKey: boolean } = {
+    provider: 'openrouter',
+    model: 'default',
+    hasKey: false,
+  };
   private mcpSnapshots: McpSnapshotSummary[] = [];
   private copyHistory: CopyHistoryItem[] = [];
   private mcpListener: any = null;
@@ -76,6 +104,79 @@ export class ElementInspector {
         this.rawPreviewText = this.buildLayerRawPreview(id);
         this.openModal = 'raw';
         this.renderStudio();
+      },
+      onCopyLayer: (id) => this.handleCopySingleLayer(id),
+      onSwitchInspectorTab: (tab) => {
+        this.inspectorTab = tab;
+        if (tab === 'ai') this.loadAiSummary();
+        this.renderStudio();
+      },
+      onRunScrCapture: (mode: ScrCaptureMode) => this.handleStudioScreenshot(mode),
+      onToggleScrOption: (key) => {
+        this.scrConfig[key] = !this.scrConfig[key];
+        this.renderStudio();
+      },
+      onCycleScrPadding: () => {
+        const order: (0 | 16 | 32)[] = [0, 16, 32];
+        this.scrConfig.padding = order[(order.indexOf(this.scrConfig.padding) + 1) % order.length];
+        this.renderStudio();
+      },
+      onToggleScrFormat: () => {
+        this.scrConfig.format = this.scrConfig.format === 'png' ? 'jpeg' : 'png';
+        this.renderStudio();
+      },
+      onEditScreenshot: (id) => {
+        const item = this.screenshots.find((s) => s.id === id);
+        if (!item) return;
+        this.scrEditor.open(item, {
+          onSave: (itemId, updatedDataUrl, caption, frame, annotations) => {
+            const target = this.screenshots.find((s) => s.id === itemId);
+            if (target) {
+              target.dataUrl = updatedDataUrl;
+              target.caption = caption;
+              target.frame = frame;
+              target.annotations = annotations;
+              this.renderStudio();
+              this.overlayUi?.showToast(`${target.name} updated!`);
+            }
+          },
+          onCopyImage: (url, caption, frame, annotations) => {
+            item.dataUrl = url;
+            item.caption = caption;
+            item.frame = frame;
+            item.annotations = annotations;
+            this.renderStudio();
+            this.copyDataUrlToClipboard(url, caption);
+          },
+          onDownload: (url, fname) => this.downloadDataUrl(url, fname),
+          onSendToAi: (scrItem, updatedUrl, caption, annotations) => {
+            scrItem.dataUrl = updatedUrl;
+            scrItem.caption = caption;
+            scrItem.annotations = annotations;
+            this.sendScreenshotToMcp(scrItem);
+          },
+        });
+      },
+      onCopyScreenshot: (id) => {
+        const item = this.screenshots.find((s) => s.id === id);
+        if (item) this.copyDataUrlToClipboard(item.dataUrl, item.caption);
+      },
+      onDownloadScreenshot: (id) => {
+        const item = this.screenshots.find((s) => s.id === id);
+        if (item) this.downloadDataUrl(item.dataUrl, `${item.name.toLowerCase().replace(/\s+/g, '-')}.${this.scrConfig.format}`);
+      },
+      onSendScreenshotToAi: (id) => {
+        const item = this.screenshots.find((s) => s.id === id);
+        if (item) this.sendScreenshotToMcp(item);
+      },
+      onDeleteScreenshot: (id) => {
+        this.screenshots = this.screenshots.filter((s) => s.id !== id);
+        this.screenshots.forEach((s, idx) => { s.index = idx + 1; s.name = `SCR ${idx + 1}`; });
+        this.renderStudio();
+      },
+      onRunAiVisionScan: () => {
+        this.stop();
+        autoBugDetector.runDetection();
       },
       onOpenFullRaw: () => {
         this.rawPreviewText = this.buildStructuredCopyPrompt() || 'No layers picked yet.';
@@ -265,7 +366,20 @@ export class ElementInspector {
 
     this.attachEventListeners();
     this.refreshMcpSnapshots();
+    this.loadAiSummary();
     this.renderStudio();
+  }
+
+  private loadAiSummary() {
+    chrome.storage.local.get(['aiProvider', 'aiModel', 'aiApiKey']).then((data) => {
+      const provider = data.aiProvider || 'openrouter';
+      this.aiSummary = {
+        provider,
+        model: data.aiModel || 'default',
+        hasKey: Boolean(data.aiApiKey) || provider === 'ollama',
+      };
+      this.renderStudio();
+    });
   }
 
   stop() {
@@ -275,8 +389,10 @@ export class ElementInspector {
     this.detachEventListeners();
     this.markupStudio?.destroy();
     this.markupStudio = null;
+    this.scrEditor.close();
     this.overlayUi?.remove();
     this.layers = [];
+    this.screenshots = [];
     this.globalAnnotations = [];
     this.activeLayerId = null;
   }
@@ -327,6 +443,10 @@ export class ElementInspector {
       finalInstructions: this.finalInstructions,
       isRightSliderOpen: this.isRightSliderOpen,
       rightSliderTab: this.rightSliderTab,
+      inspectorTab: this.inspectorTab,
+      scrConfig: this.scrConfig,
+      screenshots: this.screenshots,
+      aiSummary: this.aiSummary,
       mcpSnapshots: this.mcpSnapshots,
       copyHistory: this.copyHistory,
     });
@@ -583,6 +703,7 @@ export class ElementInspector {
       tag: 'design',
       note: '',
       visible: true,
+      semanticAnchors: this.extractSemanticAnchors(element),
       annotations: this.layers.length === 0 ? [...this.globalAnnotations] : [],
     };
 
@@ -594,6 +715,79 @@ export class ElementInspector {
     this.syncPins();
     this.renderStudio();
     this.captureLayerThumbnail(layer.id, rect);
+    this.probeSourceContext(element).then((src) => {
+      if (!src) return;
+      const target = this.layers.find((l) => l.id === layer.id);
+      if (target) {
+        target.sourceContext = src;
+        this.renderStudio();
+      }
+    });
+  }
+
+  private extractSemanticAnchors(el: HTMLElement): SemanticAnchors | undefined {
+    const ariaLabel = el.getAttribute('aria-label')?.trim() || undefined;
+    const role = el.getAttribute('role')?.trim() || undefined;
+    const dataTestId =
+      el.getAttribute('data-testid')?.trim() ||
+      el.getAttribute('data-test-id')?.trim() ||
+      el.getAttribute('data-cy')?.trim() ||
+      undefined;
+
+    let nearestHeading: string | undefined;
+    let curr: HTMLElement | null = el;
+    let depth = 0;
+    while (curr && depth < 6 && !nearestHeading) {
+      const heading = curr.querySelector('h1, h2, h3, h4') as HTMLElement | null;
+      if (heading?.innerText?.trim()) {
+        nearestHeading = heading.innerText.trim().slice(0, 80);
+        break;
+      }
+      curr = curr.parentElement;
+      depth++;
+    }
+
+    if (!ariaLabel && !role && !dataTestId && !nearestHeading) return undefined;
+    return { nearestHeading, ariaLabel, role, dataTestId };
+  }
+
+  private probeSourceContext(el: HTMLElement): Promise<SourceContextInfo | undefined> {
+    return new Promise((resolve) => {
+      const marker = `ltm_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
+      const id = `req_${marker}`;
+      let settled = false;
+
+      const cleanup = () => {
+        el.removeAttribute('data-letme-probe');
+        document.removeEventListener('letme-bridge:response', onResponse);
+      };
+
+      const timer = setTimeout(() => {
+        if (settled) return;
+        settled = true;
+        cleanup();
+        resolve(undefined);
+      }, 250);
+
+      const onResponse = (event: Event) => {
+        const detail = (event as CustomEvent<{ id?: string; result?: SourceContextInfo | null }>).detail;
+        if (detail?.id !== id || settled) return;
+        settled = true;
+        clearTimeout(timer);
+        cleanup();
+        resolve(detail.result || undefined);
+      };
+
+      try {
+        el.setAttribute('data-letme-probe', marker);
+        document.addEventListener('letme-bridge:response', onResponse);
+        document.dispatchEvent(new CustomEvent('letme-bridge:request', { detail: { id, marker } }));
+      } catch {
+        clearTimeout(timer);
+        cleanup();
+        resolve(undefined);
+      }
+    });
   }
 
   private formatAnnotationLine(ann: MarkupAnnotation, idx: number): string {
@@ -603,11 +797,13 @@ export class ElementInspector {
     const detail =
       ann.type === 'text'
         ? `"${ann.text || ''}"`
-        : ann.type === 'ruler'
-          ? `Measured ${ann.text || '0px'}`
-          : ann.type === 'blur'
-            ? 'Censored region'
-            : ann.text || `${ann.type} marker`;
+        : ann.type === 'sticky'
+          ? `Sticky Note [${ann.stickyTheme || 'amber'}]: "${ann.text || ''}"`
+          : ann.type === 'ruler'
+            ? `Measured ${ann.text || '0px'}`
+            : ann.type === 'blur'
+              ? 'Censored region'
+              : ann.text || `${ann.type} marker`;
     return `  ${idx + 1}. **${ann.type.toUpperCase()}**${color}${stroke}${rot}: ${detail}`;
   }
 
@@ -625,6 +821,8 @@ export class ElementInspector {
       layoutContext: getContainerContext(el),
       layoutBugs: diagnoseLayoutBugs(el),
       computedStyles: getKeyComputedStyles(el),
+      sourceContext: layer.sourceContext,
+      semanticAnchors: layer.semanticAnchors,
       annotations: layer.annotations,
     };
   }
@@ -638,6 +836,24 @@ export class ElementInspector {
       `- **Box Model**: ${bm.width}×${bm.height}px | Margin: ${bm.margin.top}/${bm.margin.right}/${bm.margin.bottom}/${bm.margin.left} | Padding: ${bm.padding.top}/${bm.padding.right}/${bm.padding.bottom}/${bm.padding.left}`,
       `- **Parent Context**: \`${ctx.parentTagName}\` (\`${ctx.parentSelector}\`, display: \`${ctx.display}\`, position: \`${ctx.position}\`)`,
     ];
+
+    if (detail.sourceContext) {
+      const sc = detail.sourceContext;
+      const parts: string[] = [`Framework: \`${sc.framework}\``];
+      if (sc.componentName) parts.push(`Component: \`${sc.componentName}\``);
+      if (sc.ownerChain?.length) parts.push(`Owner Chain: \`${sc.ownerChain.join(' -> ')}\``);
+      if (sc.filePath) parts.push(`Source: \`${sc.filePath}${sc.lineRange ? `:${sc.lineRange}` : ''}\``);
+      lines.push(`- **Component & Source Mapping**: ${parts.join(' | ')}`);
+    }
+    if (detail.semanticAnchors) {
+      const sa = detail.semanticAnchors;
+      const anchors: string[] = [];
+      if (sa.nearestHeading) anchors.push(`Heading: "${sa.nearestHeading}"`);
+      if (sa.ariaLabel) anchors.push(`aria-label: "${sa.ariaLabel}"`);
+      if (sa.role) anchors.push(`role: \`${sa.role}\``);
+      if (sa.dataTestId) anchors.push(`data-testid: \`${sa.dataTestId}\``);
+      if (anchors.length > 0) lines.push(`- **Semantic Anchors**: ${anchors.join(' | ')}`);
+    }
 
     if (ctx.isFlexChild && ctx.flexParent) {
       lines.push(`- **Flex Parent**: direction=\`${ctx.flexParent.flexDirection}\`, justify=\`${ctx.flexParent.justifyContent}\`, align=\`${ctx.flexParent.alignItems}\`, gap=\`${ctx.flexParent.gap}\``);
@@ -711,6 +927,231 @@ export class ElementInspector {
     return sections.join('\n');
   }
 
+  private async handleStudioScreenshot(mode: ScrCaptureMode) {
+    let cropRect: DOMRect | null = null;
+
+    if (mode === 'layer') {
+      const activeLayer = this.layers.find((l) => l.id === this.activeLayerId) || this.layers[0];
+      if (!activeLayer) {
+        this.overlayUi?.showToast('Pick a layer first for Active Layer capture.', true);
+        return;
+      }
+      const r = activeLayer.element.getBoundingClientRect();
+      const pad = this.scrConfig.padding;
+      cropRect = new DOMRect(
+        Math.max(0, r.left - pad),
+        Math.max(0, r.top - pad),
+        r.width + pad * 2,
+        r.height + pad * 2
+      );
+    } else if (mode === 'area') {
+      this.overlayUi?.setHostVisible(false);
+      cropRect = await screenshotTool.selectAreaOnly();
+      this.overlayUi?.setHostVisible(true);
+      if (!cropRect) return;
+    } else if (mode === 'delay') {
+      for (const sec of [3, 2, 1]) {
+        this.overlayUi?.showToast(`Capturing in ${sec}s...`);
+        await new Promise((r) => setTimeout(r, 1000));
+      }
+    }
+
+    if (this.scrConfig.hideHud) {
+      this.overlayUi?.setHostVisible(false);
+      await new Promise((r) => setTimeout(r, 60));
+    }
+
+    try {
+      const response = await chrome.runtime.sendMessage({ type: 'CAPTURE_TAB' });
+      const rawUrl: string = response?.dataUrl || '';
+      if (!rawUrl) throw new Error('Capture failed');
+
+      const img = new Image();
+      await new Promise((res, rej) => {
+        img.onload = res;
+        img.onerror = rej;
+        img.src = rawUrl;
+      });
+
+      const dpr = img.width / Math.max(1, window.innerWidth);
+      const canvas = document.createElement('canvas');
+      if (cropRect) {
+        canvas.width = Math.max(1, Math.round(cropRect.width * dpr));
+        canvas.height = Math.max(1, Math.round(cropRect.height * dpr));
+      } else {
+        canvas.width = img.width;
+        canvas.height = img.height;
+      }
+      const ctx = canvas.getContext('2d')!;
+      if (cropRect) {
+        ctx.drawImage(
+          img,
+          Math.round(cropRect.left * dpr),
+          Math.round(cropRect.top * dpr),
+          Math.round(cropRect.width * dpr),
+          Math.round(cropRect.height * dpr),
+          0,
+          0,
+          canvas.width,
+          canvas.height
+        );
+      } else {
+        ctx.drawImage(img, 0, 0);
+      }
+
+      if (this.scrConfig.includeMarkup && this.markupStudio) {
+        const markupCanvas = this.markupStudio.getCanvasElement();
+        if (cropRect) {
+          ctx.drawImage(
+            markupCanvas,
+            cropRect.left,
+            cropRect.top,
+            cropRect.width,
+            cropRect.height,
+            0,
+            0,
+            canvas.width,
+            canvas.height
+          );
+        } else {
+          ctx.drawImage(markupCanvas, 0, 0, canvas.width, canvas.height);
+        }
+      }
+
+      const mime = this.scrConfig.format === 'jpeg' ? 'image/jpeg' : 'image/png';
+      const finalUrl = canvas.toDataURL(mime, 0.92);
+      const idx = this.screenshots.length + 1;
+      const item: ScreenshotLayerItem = {
+        id: `scr_${Date.now()}_${Math.random().toString(36).substring(2, 5)}`,
+        index: idx,
+        name: `SCR ${idx}`,
+        mode,
+        dataUrl: finalUrl,
+        originalDataUrl: finalUrl,
+        width: canvas.width,
+        height: canvas.height,
+        timestamp: Date.now(),
+        caption: '',
+        frame: 'none',
+      };
+
+      this.screenshots.push(item);
+      if (this.scrConfig.autoCopy) {
+        await this.copyDataUrlToClipboard(finalUrl);
+      } else {
+        this.overlayUi?.showToast(`${item.name} captured!`);
+      }
+    } catch (err: any) {
+      this.overlayUi?.showToast(`Screenshot error: ${err.message}`, true);
+    } finally {
+      this.overlayUi?.setHostVisible(true);
+      this.renderStudio();
+    }
+  }
+
+  private async copyDataUrlToClipboard(dataUrl: string, caption?: string) {
+    try {
+      const res = await fetch(dataUrl);
+      const blob = await res.blob();
+      const trimmed = caption?.trim();
+      if (trimmed) {
+        try {
+          await navigator.clipboard.write([
+            new ClipboardItem({
+              'image/png': blob,
+              'text/plain': new Blob([trimmed], { type: 'text/plain' }),
+            }),
+          ]);
+          this.overlayUi?.showToast('Screenshot + caption saved & copied!');
+          return;
+        } catch {
+          // Fallback to image-only ClipboardItem if multi-MIME is rejected
+        }
+      }
+      await navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })]);
+      this.overlayUi?.showToast('Screenshot copied to clipboard!');
+    } catch {
+      this.overlayUi?.showToast('Saved to SCR list (clipboard unavailable).');
+    }
+  }
+
+  private downloadDataUrl(dataUrl: string, filename: string) {
+    const a = document.createElement('a');
+    a.href = dataUrl;
+    a.download = filename;
+    a.click();
+  }
+
+  private sendScreenshotToMcp(item: ScreenshotLayerItem) {
+    const snapshot: ElementSnapshot = {
+      id: item.id,
+      timestamp: Date.now(),
+      url: window.location.href,
+      pageTitle: document.title,
+      selector: `screenshot:${item.mode}`,
+      tagName: 'screenshot',
+      classNames: [],
+      outerHtmlSnippet: `<!-- ${item.name} (${item.width}x${item.height}px) -->`,
+      boxModel: {
+        width: item.width,
+        height: item.height,
+        margin: { top: 0, right: 0, bottom: 0, left: 0 },
+        border: { top: 0, right: 0, bottom: 0, left: 0 },
+        padding: { top: 0, right: 0, bottom: 0, left: 0 },
+        content: { width: item.width, height: item.height },
+        boundingBox: { x: 0, y: 0, top: 0, right: item.width, bottom: item.height, left: 0, width: item.width, height: item.height },
+      },
+      layoutContext: {
+        parentTagName: 'viewport',
+        parentSelector: 'body',
+        display: 'block',
+        position: 'static',
+        isFlexChild: false,
+        isGridChild: false,
+      },
+      layoutBugs: { hasHorizontalScrollLeak: false, isClippedByAncestor: false, hasZIndexConflict: false, zIndex: 'auto', warnings: [] },
+      computedStyles: {},
+      screenshotBase64: item.dataUrl,
+      userInstructions: item.caption.trim() || `${item.name} (${item.mode}) captured from LetMe Studio`,
+      annotations: [],
+      viewport: {
+        width: window.innerWidth,
+        height: window.innerHeight,
+        devicePixelRatio: window.devicePixelRatio || 1,
+      },
+    };
+    chrome.runtime.sendMessage({ type: 'ELEMENT_CAPTURED', payload: snapshot }, (res) => {
+      if (res?.snapshots) {
+        this.mcpSnapshots = res.snapshots;
+        this.renderStudio();
+      }
+    });
+    this.overlayUi?.showToast(`${item.name} sent to AI via MCP!`);
+  }
+
+  private handleCopySingleLayer(layerId: string) {
+    const layer = this.layers.find((l) => l.id === layerId);
+    if (!layer) return;
+    const promptText = [
+      `# LetMe Layer ${layer.index} Prompt`,
+      `- **Page**: ${document.title}`,
+      `- **URL**: ${window.location.href}`,
+      '',
+      this.formatLayerPromptSection(this.buildLayerDetailSnapshot(layer)),
+    ].join('\n');
+    navigator.clipboard.writeText(promptText);
+    this.copyHistory.unshift({
+      id: `copy_${Date.now()}_${Math.random().toString(36).substring(2, 5)}`,
+      timestamp: Date.now(),
+      layerCount: 1,
+      summary: `Layer ${layer.index} <${layer.tagName}> [${layer.tag.toUpperCase()}]`,
+      text: promptText,
+    });
+    if (this.copyHistory.length > 20) this.copyHistory.pop();
+    this.renderStudio();
+    this.overlayUi?.showToast(`Layer ${layer.index} prompt copied!`);
+  }
+
   private handleCopyPrompt() {
     if (this.layers.length === 0) {
       this.overlayUi?.showToast('Pick at least 1 element first.', true);
@@ -778,6 +1219,9 @@ export class ElementInspector {
         layoutContext,
         layoutBugs,
         computedStyles,
+        sourceContext: layerDetails[0]?.sourceContext,
+        semanticAnchors: layerDetails[0]?.semanticAnchors,
+        status: 'pending',
         screenshotBase64: annotatedScreenshotBase64,
         userInstructions: instructions || undefined,
         userBugNotes: bugNotes || undefined,

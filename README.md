@@ -10,6 +10,7 @@
 
 <p align="center">
   <a href="#license"><img src="https://img.shields.io/badge/License-MIT-blue.svg?style=flat-square" alt="License: MIT" /></a>
+  <a href="CHANGELOG.md"><img src="https://img.shields.io/badge/Version-3.0.0-000000?style=flat-square" alt="Version: 3.0.0" /></a>
   <a href="https://www.typescriptlang.org/"><img src="https://img.shields.io/badge/TypeScript-5.7-3178C6?style=flat-square&logo=typescript&logoColor=white" alt="TypeScript" /></a>
   <a href="https://developer.chrome.com/docs/extensions/mv3/"><img src="https://img.shields.io/badge/Chrome%20Extension-Manifest%20V3-4285F4?style=flat-square&logo=googlechrome&logoColor=white" alt="Manifest V3" /></a>
   <a href="https://modelcontextprotocol.io/"><img src="https://img.shields.io/badge/MCP-Compatible-black?style=flat-square" alt="MCP Compatible" /></a>
@@ -17,7 +18,7 @@
 </p>
 
 <p align="center">
-  <a href="README.md"><b>English</b></a> &bull; <a href="README.id.md">Bahasa Indonesia</a>
+  <a href="README.md"><b>English</b></a> &bull; <a href="README.id.md">Bahasa Indonesia</a> &bull; <a href="CHANGELOG.md">Changelog (v3.0.0)</a>
 </p>
 
 ---
@@ -131,7 +132,7 @@ This compiles all packages (`@letme/shared`, `@letme/mcp-server`, and `@letme/ex
 ### Chrome Extension Installation
 
 #### Method 1: Download Pre-built Release (Fastest)
-1. Download **`letme-extension-v0.1.0.zip`** from [GitHub Releases](https://github.com/jinkaka98/LetMe/releases).
+1. Download **`letme-extension-v3.0.0.zip`** from [GitHub Releases](https://github.com/jinkaka98/LetMe/releases).
 2. Extract the `.zip` archive to a folder on your computer.
 3. Open Google Chrome and navigate to `chrome://extensions/`.
 4. Enable **Developer mode** in the top-right corner.
@@ -254,6 +255,39 @@ LetMe registers the following tools with the MCP protocol:
 | `letme_apply_css_preview` | `selector` *(string, required)*: Target CSS selector<br>`cssRules` *(object, required)*: Key-value CSS rules | Injects live CSS style rules into the target element in the active browser tab. | Confirmation message with injected rule summary |
 | `letme_clear_preview` | `selector` *(string, optional)*: Target selector to clear (clears all if omitted) | Removes injected preview CSS stylesheets and reverts the browser DOM to its original state. | Reversion confirmation message |
 | `letme_get_console_logs` | `limit` *(number, optional, default: 20)*: Maximum entries to return | Fetches recent browser console error and warning logs captured from the active webpage. | Formatted list of console messages with log levels |
+| `letme_resolve_inspection` | `id` *(string, optional)*: Snapshot ID<br>`resolutionNote` *(string, optional)*: Summary of fix applied | Marks an inspected element snapshot as `resolved` after your AI agent applies the code/CSS fix. | Confirmation message with updated status |
+
+---
+
+## One-Shot AI Prompt & MCP Skill
+
+Give your AI Coding Agent (**Antigravity**, **Cursor**, **Claude Code**, **Windsurf**, **Cline**) instant mastery over LetMe's MCP tools using either the **One-Shot Prompt** below or by saving the **MCP Skill** into your project rules.
+
+### Option 1: One-Shot Prompt (Copy & Paste into Chat)
+
+```text
+You are connected to the LetMe MCP Server (`letme`), which bridges my live Chrome browser with this codebase.
+Whenever I say "check LetMe", "fix the UI I just sent", or paste a LetMe report:
+1. Call `letme_get_active_element` (or `letme_list_inspections` first if there are multiple staged items) to retrieve the exact DOM selector, Component & Source Mapping (React/Vue component name, ownerChain, filePath), Semantic Anchors (nearestHeading, aria-label, data-testid), Box Model, Layout Bug Diagnostics, Visual Annotations / Sticky Notes, and Screenshot image.
+2. Call `letme_get_console_logs` if runtime/hydration/JS errors might be involved.
+3. Optional: Use `letme_apply_css_preview` to test CSS fixes live in my active browser tab before editing source files, and `letme_clear_preview` if reverting.
+4. Apply the clean fix directly in the corresponding source file(s), then call `letme_resolve_inspection` with a brief `resolutionNote` summarizing what was changed.
+```
+
+### Option 2: Reusable MCP Skill (`SKILL.md` / `.cursorrules`)
+
+```markdown
+---
+name: letme-ui-debugger
+description: Inspect live browser UI bugs, component source mappings, screenshots, and sticky notes via LetMe MCP, preview CSS live, and resolve inspections after fixing code.
+---
+
+# LetMe Visual UI/UX Debugging Workflow
+1. **Fetch Context**: Call `letme_get_active_element` (or `letme_list_inspections` to review queued snapshots). Read `Component & Source Mapping`, `Semantic Anchors`, `Layout Diagnostics`, `Visual Annotations`, and the attached PNG image.
+2. **Check Console**: Run `letme_get_console_logs` when investigating broken interactions or layout shifts.
+3. **Live CSS Test (Optional)**: Call `letme_apply_css_preview({ selector, cssRules })` to verify visual alignment in the user's open tab before touching code.
+4. **Fix & Close Loop**: Edit the exact component/stylesheet in the repository, verify build/tests, and call `letme_resolve_inspection({ id, resolutionNote })`.
+```
 
 ---
 

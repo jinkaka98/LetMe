@@ -8,6 +8,14 @@ export class ScreenshotTool {
   private startY: number = 0;
   private currentX: number = 0;
   private currentY: number = 0;
+  private areaResolver: ((rect: DOMRect | null) => void) | null = null;
+
+  selectAreaOnly(): Promise<DOMRect | null> {
+    return new Promise((resolve) => {
+      this.areaResolver = resolve;
+      this.startAreaCapture();
+    });
+  }
 
   startAreaCapture() {
     this.cleanup();
@@ -106,6 +114,13 @@ export class ScreenshotTool {
 
     this.cleanup();
 
+    if (this.areaResolver) {
+      const resolve = this.areaResolver;
+      this.areaResolver = null;
+      resolve(w >= 10 && h >= 10 ? new DOMRect(x, y, w, h) : null);
+      return;
+    }
+
     if (w < 10 || h < 10) return; // Ignore accidental clicks
 
     await this.captureAndProcessCrop(x, y, w, h);
@@ -114,6 +129,11 @@ export class ScreenshotTool {
   private onKeyDown = (e: KeyboardEvent) => {
     if (e.key === 'Escape') {
       this.cleanup();
+      if (this.areaResolver) {
+        const resolve = this.areaResolver;
+        this.areaResolver = null;
+        resolve(null);
+      }
     }
   };
 

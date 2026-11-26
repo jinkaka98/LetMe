@@ -54,6 +54,18 @@ export class StateStore {
     return true;
   }
 
+  resolveSnapshot(id?: string, resolutionNote?: string): ElementSnapshot | null {
+    const target = id
+      ? this.snapshots.find((s) => s.id === id || s.id.toLowerCase() === id.toLowerCase()) || null
+      : this.activeElement;
+    if (!target) return null;
+    target.status = 'resolved';
+    if (resolutionNote?.trim()) {
+      target.resolutionNote = resolutionNote.trim();
+    }
+    return target;
+  }
+
   addConsoleLogs(logs: ConsoleLogEntry[]) {
     this.consoleLogs.push(...logs);
     if (this.consoleLogs.length > 100) {

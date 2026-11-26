@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "LetMe - Visual UI/UX Inspector & Debugger for AI",
-  "version": "0.2.0",
+  "version": "3.0.0",
   "description": "Visual frontend inspector, multi-element staging picker, markup studio, area screenshot, and AI auto bug detection for AI coding agents via MCP.",
   "permissions": [
     "activeTab",

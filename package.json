@@ -1,6 +1,6 @@
 {
   "name": "letme",
-  "version": "0.1.0",
+  "version": "3.0.0",
   "private": true,
   "description": "Visual Frontend UI/UX Inspector & Debugger via Model Context Protocol (MCP)",
   "workspaces": [

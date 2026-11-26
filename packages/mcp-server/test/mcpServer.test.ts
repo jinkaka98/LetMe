@@ -5,6 +5,7 @@ import { handleGetActiveElement } from '../dist/tools/getActiveElement.js';
 import { handleListInspections } from '../dist/tools/listInspections.js';
 import { handleClearPreview } from '../dist/tools/clearPreview.js';
 import { handleGetConsoleLogs } from '../dist/tools/getConsoleLogs.js';
+import { handleResolveInspection } from '../dist/tools/resolveInspection.js';
 import type { ElementSnapshot } from '@letme/shared';
 
 test('StateStore stores and retrieves active element snapshot', () => {
@@ -299,4 +300,65 @@ test('handleGetActiveElement renders multi-layer breakdown and globalInstruction
   assert.match(txt, /Layer #2 \[BUG\]/);
   assert.match(txt, /Additional Final Instructions/);
   assert.match(txt, /Keep dark monochrome theme consistent/);
+});
+
+test('handleGetActiveElement renders sourceContext/semanticAnchors and handleResolveInspection marks resolved', () => {
+  const baseBox = {
+    width: 140,
+    height: 44,
+    margin: { top: 0, right: 0, bottom: 0, left: 0 },
+    border: { top: 0, right: 0, bottom: 0, left: 0 },
+    padding: { top: 10, right: 16, bottom: 10, left: 16 },
+    content: { width: 108, height: 24 },
+    boundingBox: { x: 0, y: 0, top: 0, right: 140, bottom: 44, left: 0, width: 140, height: 44 },
+  };
+  const snap: ElementSnapshot = {
+    id: 'snap_src_1',
+    timestamp: Date.now(),
+    url: 'http://localhost:3000/pricing',
+    pageTitle: 'Pricing',
+    selector: '.pricing-cta',
+    tagName: 'button',
+    classNames: ['pricing-cta'],
+    outerHtmlSnippet: '<button class="pricing-cta">Upgrade</button>',
+    boxModel: baseBox,
+    layoutContext: { parentTagName: 'div', parentSelector: '.card', display: 'flex', position: 'relative', isFlexChild: true, isGridChild: false },
+    layoutBugs: { hasHorizontalScrollLeak: false, isClippedByAncestor: false, hasZIndexConflict: false, zIndex: 'auto', warnings: [] },
+    computedStyles: { color: '#ffffff' },
+    sourceContext: {
+      framework: 'react',
+      componentName: 'PricingCard',
+      ownerChain: ['App', 'PricingSection', 'PricingCard'],
+      filePath: 'src/components/PricingCard.tsx',
+      lineRange: '42-52',
+    },
+    semanticAnchors: {
+      nearestHeading: 'Pro Plan',
+      ariaLabel: 'Upgrade to Pro',
+      dataTestId: 'upgrade-pro-btn',
+    },
+    status: 'pending',
+    annotations: [{ id: 'sn1', type: 'sticky', stickyTheme: 'rose', text: 'Check mobile alignment' }],
+    viewport: { width: 1280, height: 720, devicePixelRatio: 1 },
+  };
+
+  globalStore.setActiveElement(snap);
+  const activeRes = handleGetActiveElement('snap_src_1');
+  const activeTxt = activeRes.content[0].type === 'text' ? activeRes.content[0].text : '';
+  assert.match(activeTxt, /Component & Source Mapping/);
+  assert.match(activeTxt, /PricingCard/);
+  assert.match(activeTxt, /src\/components\/PricingCard\.tsx:42-52/);
+  assert.match(activeTxt, /Semantic Anchors/);
+  assert.match(activeTxt, /Pro Plan/);
+  assert.match(activeTxt, /upgrade-pro-btn/);
+  assert.match(activeTxt, /Sticky Note \[rose\]: "Check mobile alignment"/);
+
+  const resolveRes = handleResolveInspection({ id: 'snap_src_1', resolutionNote: 'Updated PricingCard.tsx padding' });
+  const resolveTxt = resolveRes.content[0].type === 'text' ? resolveRes.content[0].text : '';
+  assert.match(resolveTxt, /\*\*resolved\*\*/);
+  assert.match(resolveTxt, /Updated PricingCard\.tsx padding/);
+
+  const afterRes = handleGetActiveElement('snap_src_1');
+  const afterTxt = afterRes.content[0].type === 'text' ? afterRes.content[0].text : '';
+  assert.match(afterTxt, /\*\*Status\*\*: `resolved`/);
 });

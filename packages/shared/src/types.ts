@@ -61,6 +61,8 @@ export interface MarkupPoint {
   y: number;
 }
 
+export type StickyNoteThemeId = 'amber' | 'rose' | 'sky' | 'mint' | 'dark';
+
 export interface MarkupAnnotation {
   id: string;
   type:
@@ -75,16 +77,33 @@ export interface MarkupAnnotation {
     | 'line'
     | 'text'
     | 'ruler'
-    | 'blur';
+    | 'blur'
+    | 'sticky';
   color?: string;
   strokeWidth?: number;
   points?: MarkupPoint[]; // For pen
-  startPoint?: MarkupPoint; // For arrow, box, ruler, blur
+  startPoint?: MarkupPoint; // For arrow, box, ruler, blur, sticky
   endPoint?: MarkupPoint;
-  text?: string; // For text annotation or ruler distance label
+  text?: string; // For text annotation, ruler distance label, or sticky note content
   fontFamily?: string; // For text annotation
+  stickyTheme?: StickyNoteThemeId; // Theme for sticky note
   blurArea?: { x: number; y: number; width: number; height: number };
   rotation?: number; // Radians
+}
+
+export interface SourceContextInfo {
+  framework: 'react' | 'vue' | 'unknown';
+  componentName?: string;
+  ownerChain?: string[];
+  filePath?: string;
+  lineRange?: string;
+}
+
+export interface SemanticAnchors {
+  nearestHeading?: string;
+  ariaLabel?: string;
+  role?: string;
+  dataTestId?: string;
 }
 
 export interface McpSnapshotSummary {
@@ -93,6 +112,8 @@ export interface McpSnapshotSummary {
   tagName: string;
   selector: string;
   url: string;
+  status?: 'pending' | 'resolved';
+  resolutionNote?: string;
   userInstructions?: string;
   userBugNotes?: string;
 }
@@ -116,6 +137,8 @@ export interface LayerSnapshotDetail {
   layoutContext: ContainerLayoutContext;
   layoutBugs: LayoutBugReport;
   computedStyles: Record<string, string>;
+  sourceContext?: SourceContextInfo;
+  semanticAnchors?: SemanticAnchors;
   annotations: MarkupAnnotation[];
 }
 
@@ -134,6 +157,10 @@ export interface ElementSnapshot {
   layoutContext: ContainerLayoutContext;
   layoutBugs: LayoutBugReport;
   computedStyles: Record<string, string>;
+  sourceContext?: SourceContextInfo;
+  semanticAnchors?: SemanticAnchors;
+  status?: 'pending' | 'resolved';
+  resolutionNote?: string;
   screenshotBase64?: string; // PNG base64 cropped to element + annotations
   fullViewportScreenshotBase64?: string;
   userInstructions?: string;

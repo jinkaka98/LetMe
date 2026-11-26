@@ -10,6 +10,7 @@
 
 <p align="center">
   <a href="#lisensi"><img src="https://img.shields.io/badge/Lisensi-MIT-blue.svg?style=flat-square" alt="Lisensi: MIT" /></a>
+  <a href="CHANGELOG.md"><img src="https://img.shields.io/badge/Versi-3.0.0-000000?style=flat-square" alt="Versi: 3.0.0" /></a>
   <a href="https://www.typescriptlang.org/"><img src="https://img.shields.io/badge/TypeScript-5.7-3178C6?style=flat-square&logo=typescript&logoColor=white" alt="TypeScript" /></a>
   <a href="https://developer.chrome.com/docs/extensions/mv3/"><img src="https://img.shields.io/badge/Chrome%20Extension-Manifest%20V3-4285F4?style=flat-square&logo=googlechrome&logoColor=white" alt="Manifest V3" /></a>
   <a href="https://modelcontextprotocol.io/"><img src="https://img.shields.io/badge/MCP-Compatible-black?style=flat-square" alt="MCP Compatible" /></a>
@@ -17,7 +18,7 @@
 </p>
 
 <p align="center">
-  <a href="README.md">English</a> &bull; <a href="README.id.md"><b>Bahasa Indonesia</b></a>
+  <a href="README.md">English</a> &bull; <a href="README.id.md"><b>Bahasa Indonesia</b></a> &bull; <a href="CHANGELOG.md">Changelog (v3.0.0)</a>
 </p>
 
 ---
@@ -131,7 +132,7 @@ Perintah di atas akan mengompilasi seluruh paket (`@letme/shared`, `@letme/mcp-s
 ### Memasang Ekstensi di Google Chrome
 
 #### Metode 1: Unduh Rilis Siap Pakai (Tercepat)
-1. Unduh file **`letme-extension-v0.1.0.zip`** dari halaman [GitHub Releases](https://github.com/jinkaka98/LetMe/releases).
+1. Unduh file **`letme-extension-v3.0.0.zip`** dari halaman [GitHub Releases](https://github.com/jinkaka98/LetMe/releases).
 2. Ekstrak file zip tersebut ke salah satu folder di komputer Anda.
 3. Buka Google Chrome dan buka `chrome://extensions/`.
 4. Aktifkan sakelar **Developer mode** di pojok kanan atas.
@@ -254,6 +255,39 @@ LetMe mendaftarkan kumpulan tool berikut ke dalam protokol MCP:
 | `letme_apply_css_preview` | `selector` *(string, wajib)*: Selector CSS target<br>`cssRules` *(object, wajib)*: Pasangan key-value aturan CSS | Menyuntikkan aturan gaya CSS langsung ke elemen target di tab browser yang aktif secara real-time. | Pesan konfirmasi beserta ringkasan aturan yang disuntikkan |
 | `letme_clear_preview` | `selector` *(string, opsional)*: Selector target yang ingin dibersihkan (membersihkan semua jika dikosongkan) | Menghapus stylesheet preview yang disuntikkan dan mengembalikan tampilan DOM browser ke kondisi aslinya. | Pesan konfirmasi pembatalan gaya |
 | `letme_get_console_logs` | `limit` *(number, opsional, default: 20)*: Jumlah entri maksimum | Mengambil log error dan peringatan konsol browser terbaru dari halaman web aktif. | Daftar pesan konsol terformat dengan level log |
+| `letme_resolve_inspection` | `id` *(string, opsional)*: ID snapshot<br>`resolutionNote` *(string, opsional)*: Ringkasan perbaikan | Menandai snapshot inspeksi sebagai `resolved` setelah AI selesai memperbaiki kode/CSS. | Pesan konfirmasi status terbaru |
+
+---
+
+## One-Shot AI Prompt & MCP Skill
+
+Berikan pemahaman instan kepada AI Coding Agent Anda (**Antigravity**, **Cursor**, **Claude Code**, **Windsurf**, **Cline**) tentang cara memakai MCP Server LetMe lewat **One-Shot Prompt** atau file **MCP Skill** berikut.
+
+### Opsi 1: One-Shot Prompt (Langsung Copy-Paste ke Chat AI)
+
+```text
+Kamu terhubung ke LetMe MCP Server (`letme`) yang menghubungkan browser Chrome aktif saya ke codebase ini.
+Setiap kali saya bilang "cek LetMe", "perbaiki UI yang barusan saya kirim", atau menempelkan laporan LetMe:
+1. Panggil `letme_get_active_element` (atau `letme_list_inspections` jika ada beberapa item) untuk mengambil CSS selector, Component & Source Mapping (nama komponen React/Vue, ownerChain, filePath), Semantic Anchors (nearestHeading, aria-label, data-testid), Box Model, Layout Diagnostics, anotasi/Sticky Note, dan gambar screenshot.
+2. Panggil `letme_get_console_logs` bila ada kemungkinan error runtime/JS.
+3. Opsional: Gunakan `letme_apply_css_preview` untuk menguji perbaikan CSS secara live di tab browser saya sebelum mengubah file kode, dan `letme_clear_preview` untuk mengembalikannya.
+4. Terapkan perbaikan pada file sumber terkait, lalu panggil `letme_resolve_inspection` dengan `resolutionNote` singkat berisi file yang diubah.
+```
+
+### Opsi 2: MCP Skill Siap Pakai (`SKILL.md` / `.cursorrules`)
+
+```markdown
+---
+name: letme-ui-debugger
+description: Inspeksi bug UI browser, source mapping komponen, screenshot, dan sticky note via LetMe MCP, uji CSS live, lalu tandai selesai setelah kode diperbaiki.
+---
+
+# Alur Kerja LetMe Visual UI/UX Debugging
+1. **Ambil Konteks**: Panggil `letme_get_active_element` (atau `letme_list_inspections`). Baca `Component & Source Mapping`, `Semantic Anchors`, `Layout Diagnostics`, `Visual Annotations`, dan blok gambar PNG.
+2. **Cek Console**: Jalankan `letme_get_console_logs` untuk memeriksa error/warning di browser.
+3. **Uji CSS Live (Opsional)**: Panggil `letme_apply_css_preview({ selector, cssRules })` untuk memvalidasi tampilan langsung di browser.
+4. **Perbaiki & Tutup Siklus**: Edit komponen/CSS pada codebase, verifikasi build/test, lalu panggil `letme_resolve_inspection({ id, resolutionNote })`.
+```
 
 ---
 

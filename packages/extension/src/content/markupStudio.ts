@@ -1,4 +1,5 @@
 import { MarkupAnnotation, MarkupPoint } from '@letme/shared';
+import { drawStickyNoteOnCanvas, getNextStickyTheme, getStickyTheme } from './stickyThemes.js';
 
 export type MarkupTool =
   | 'select'
@@ -14,7 +15,8 @@ export type MarkupTool =
   | 'line'
   | 'text'
   | 'ruler'
-  | 'blur';
+  | 'blur'
+  | 'sticky';
 
 type TransformHandle = 'tl' | 't' | 'tr' | 'r' | 'br' | 'b' | 'bl' | 'l' | 'rotate';
 
@@ -26,6 +28,11 @@ const SHAPE_TOOLS = new Set<MarkupTool>([
   'triangle',
   'callout',
 ]);
+
+export interface MarkupStudioOptions {
+  mode?: 'fullscreen' | 'contained';
+  container?: HTMLElement;
+}
 
 export class MarkupStudio {
   private canvas: HTMLCanvasElement;
@@ -50,18 +57,32 @@ export class MarkupStudio {
 
   // Eraser hover state
   private hoveredEraseId: string | null = null;
+  private stickyHost: HTMLDivElement;
+  private stickyShadow: ShadowRoot;
+  private mode: 'fullscreen' | 'contained';
 
-  constructor(width: number, height: number) {
+  constructor(width: number, height: number, options?: MarkupStudioOptions) {
+    this.mode = options?.mode || 'fullscreen';
+    const targetParent = options?.container || document.body;
+
     this.canvas = document.createElement('canvas');
     this.canvas.className = 'letme-markup-canvas';
     this.canvas.width = width;
     this.canvas.height = height;
-    this.canvas.style.position = 'fixed';
-    this.canvas.style.top = '0';
-    this.canvas.style.left = '0';
-    this.canvas.style.width = '100vw';
-    this.canvas.style.height = '100vh';
-    this.canvas.style.zIndex = '2147483640';
+    if (this.mode === 'contained') {
+      this.canvas.style.position = 'absolute';
+      this.canvas.style.inset = '0';
+      this.canvas.style.width = '100%';
+      this.canvas.style.height = '100%';
+      this.canvas.style.zIndex = '2';
+    } else {
+      this.canvas.style.position = 'fixed';
+      this.canvas.style.top = '0';
+      this.canvas.style.left = '0';
+      this.canvas.style.width = '100vw';
+      this.canvas.style.height = '100vh';
+      this.canvas.style.zIndex = '2147483640';
+    }
     this.canvas.style.pointerEvents = 'auto';
     this.canvas.style.cursor = 'crosshair';
 
@@ -70,6 +91,49 @@ export class MarkupStudio {
       throw new Error('Canvas 2D context not available');
     }
     this.ctx = ctx;
+
+    this.stickyHost = document.createElement('div');
+    this.stickyHost.id = this.mode === 'contained' ? 'letme-sticky-contained-root' : 'letme-sticky-overlay-root';
+    this.stickyHost.style.position = this.mode === 'contained' ? 'absolute' : 'fixed';
+    this.stickyHost.style.inset = '0';
+    this.stickyHost.style.zIndex = this.mode === 'contained' ? '5' : '2147483641';
+    this.stickyHost.style.pointerEvents = 'none';
+    this.stickyShadow = this.stickyHost.attachShadow({ mode: 'open' });
+    this.stickyShadow.innerHTML = `
+      <style>
+        :host { all: initial; }
+        * { box-sizing: border-box; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+        .sn-card {
+          position: ${this.mode === 'contained' ? 'absolute' : 'fixed'}; width: 210px; min-height: 116px; border-radius: 8px;
+          border: 1.5px solid #ca8a04; box-shadow: 0 10px 28px rgba(0, 0, 0, 0.45);
+          display: flex; flex-direction: column; pointer-events: auto; line-height: normal;
+        }
+        .sn-head {
+          height: 24px; padding: 0 6px; border-radius: 6px 6px 0 0;
+          display: flex; align-items: center; justify-content: space-between;
+          cursor: grab; user-select: none; border-bottom: 1px solid rgba(0,0,0,0.12);
+        }
+        .sn-head:active { cursor: grabbing; }
+        .sn-dots { font-size: 10px; opacity: 0.55; letter-spacing: 1px; }
+        .sn-actions { display: flex; align-items: center; gap: 2px; }
+        .sn-icon-btn {
+          width: 20px; height: 20px; border: none; background: transparent;
+          color: inherit; border-radius: 4px; cursor: pointer; padding: 0;
+          display: inline-flex; align-items: center; justify-content: center; opacity: 0.78;
+        }
+        .sn-icon-btn:hover { background: rgba(0,0,0,0.12); opacity: 1; }
+        .sn-body {
+          flex: 1; width: 100%; min-height: 90px; border: none; background: transparent;
+          color: inherit; padding: 8px 10px; font-size: 12px; line-height: 1.4;
+          resize: both; outline: none; font-family: inherit;
+        }
+      </style>
+      <div id="sn-container"></div>
+    `;
+    if (options?.container) {
+      targetParent.appendChild(this.canvas);
+    }
+    targetParent.appendChild(this.stickyHost);
 
     this.attachEvents();
   }
@@ -381,6 +445,27 @@ export class MarkupStudio {
       return;
     }
 
+    if (this.currentTool === 'sticky') {
+      this.pushHistory();
+      const id = `sn_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
+      const w = 210;
+      const h = 120;
+      const sx = Math.max(8, Math.min(this.canvas.width - w - 8, pt.x));
+      const sy = Math.max(8, Math.min(this.canvas.height - h - 8, pt.y));
+      this.annotations.push({
+        id,
+        type: 'sticky',
+        startPoint: { x: sx, y: sy },
+        endPoint: { x: sx + w, y: sy + h },
+        text: '',
+        stickyTheme: 'amber',
+      });
+      this.redraw();
+      this.renderStickyOverlay(id);
+      this.emitChange();
+      return;
+    }
+
     this.isDrawing = true;
     const id = `ann_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
 
@@ -629,6 +714,7 @@ export class MarkupStudio {
   private redraw() {
     this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
     for (const ann of this.annotations) {
+      if (ann.type === 'sticky') continue;
       this.drawAnnotation(ann);
       if (ann.id === this.hoveredEraseId) {
         const box = this.getAnnotationBBox(ann);
@@ -643,6 +729,118 @@ export class MarkupStudio {
       }
       if (ann.id === this.selectedId && this.currentTool === 'select') {
         this.drawTransformControls(ann);
+      }
+    }
+    this.renderStickyOverlay();
+  }
+
+  private renderStickyOverlay(focusId?: string) {
+    const container = this.stickyShadow.getElementById('sn-container');
+    if (!container) return;
+    container.innerHTML = '';
+
+    for (const ann of this.annotations) {
+      if (ann.type !== 'sticky' || !ann.startPoint) continue;
+      const theme = getStickyTheme(ann.stickyTheme);
+      const w = ann.endPoint ? Math.max(150, ann.endPoint.x - ann.startPoint.x) : 210;
+      const h = ann.endPoint ? Math.max(96, ann.endPoint.y - ann.startPoint.y) : 120;
+
+      const card = document.createElement('div');
+      card.className = 'sn-card';
+      if (this.mode === 'contained') {
+        card.style.left = `${(ann.startPoint.x / Math.max(1, this.canvas.width)) * 100}%`;
+        card.style.top = `${(ann.startPoint.y / Math.max(1, this.canvas.height)) * 100}%`;
+      } else {
+        card.style.left = `${ann.startPoint.x}px`;
+        card.style.top = `${ann.startPoint.y}px`;
+      }
+      card.style.width = `${w}px`;
+      card.style.minHeight = `${h}px`;
+      card.style.background = theme.bg;
+      card.style.borderColor = theme.border;
+      card.style.color = theme.text;
+
+      const head = document.createElement('div');
+      head.className = 'sn-head';
+      head.style.background = theme.headerBg;
+      head.innerHTML = `
+        <span class="sn-dots">⋮⋮</span>
+        <div class="sn-actions">
+          <button class="sn-icon-btn" data-sn-theme="${ann.id}" title="Ganti Tema (${theme.label})">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="13.5" cy="6.5" r=".5" fill="currentColor"/><circle cx="17.5" cy="10.5" r=".5" fill="currentColor"/><circle cx="8.5" cy="7.5" r=".5" fill="currentColor"/><circle cx="6.5" cy="12.5" r=".5" fill="currentColor"/><path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10c.926 0 1.648-.746 1.648-1.688 0-.437-.18-.835-.437-1.125-.29-.289-.438-.652-.438-1.125a1.64 1.64 0 0 1 1.668-1.668h1.996c3.051 0 5.555-2.503 5.555-5.554C21.965 6.012 17.461 2 12 2z"/></svg>
+          </button>
+          <button class="sn-icon-btn" data-sn-del="${ann.id}" title="Hapus Note">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+          </button>
+        </div>
+      `;
+
+      const body = document.createElement('textarea');
+      body.className = 'sn-body';
+      body.placeholder = 'Tulis catatan...';
+      body.value = ann.text || '';
+      body.addEventListener('input', () => {
+        ann.text = body.value;
+        this.emitChange();
+      });
+
+      head.addEventListener('mousedown', (ev) => {
+        if ((ev.target as HTMLElement).closest('button')) return;
+        ev.preventDefault();
+        const startX = ev.clientX;
+        const startY = ev.clientY;
+        const origX = ann.startPoint!.x;
+        const origY = ann.startPoint!.y;
+        const rect = this.canvas.getBoundingClientRect();
+        const scaleX = this.mode === 'contained' ? this.canvas.width / Math.max(1, rect.width) : 1;
+        const scaleY = this.mode === 'contained' ? this.canvas.height / Math.max(1, rect.height) : 1;
+        const maxX = this.mode === 'contained' ? this.canvas.width - 40 : window.innerWidth - 40;
+        const maxY = this.mode === 'contained' ? this.canvas.height - 40 : window.innerHeight - 40;
+
+        const onMove = (me: MouseEvent) => {
+          const nx = Math.max(0, Math.min(maxX, origX + (me.clientX - startX) * scaleX));
+          const ny = Math.max(0, Math.min(maxY, origY + (me.clientY - startY) * scaleY));
+          ann.startPoint = { x: nx, y: ny };
+          ann.endPoint = { x: nx + w, y: ny + h };
+          if (this.mode === 'contained') {
+            card.style.left = `${(nx / Math.max(1, this.canvas.width)) * 100}%`;
+            card.style.top = `${(ny / Math.max(1, this.canvas.height)) * 100}%`;
+          } else {
+            card.style.left = `${nx}px`;
+            card.style.top = `${ny}px`;
+          }
+        };
+        const onUp = () => {
+          window.removeEventListener('mousemove', onMove);
+          window.removeEventListener('mouseup', onUp);
+          this.emitChange();
+        };
+        window.addEventListener('mousemove', onMove);
+        window.addEventListener('mouseup', onUp);
+      });
+
+      head.querySelector(`[data-sn-theme="${ann.id}"]`)?.addEventListener('click', (ev) => {
+        ev.stopPropagation();
+        this.pushHistory();
+        ann.stickyTheme = getNextStickyTheme(ann.stickyTheme);
+        this.renderStickyOverlay();
+        this.emitChange();
+      });
+
+      head.querySelector(`[data-sn-del="${ann.id}"]`)?.addEventListener('click', (ev) => {
+        ev.stopPropagation();
+        this.pushHistory();
+        this.annotations = this.annotations.filter((a) => a.id !== ann.id);
+        this.renderStickyOverlay();
+        this.emitChange();
+      });
+
+      card.appendChild(head);
+      card.appendChild(body);
+      container.appendChild(card);
+
+      if (focusId === ann.id) {
+        setTimeout(() => body.focus(), 0);
       }
     }
   }
@@ -888,6 +1086,27 @@ export class MarkupStudio {
     }
   }
 
+  renderToContext(octx: CanvasRenderingContext2D, offsetX: number = 0, offsetY: number = 0) {
+    octx.drawImage(this.canvas, offsetX, offsetY);
+    const rect = this.canvas.getBoundingClientRect();
+    const scale = this.mode === 'contained' && rect.width > 0 ? this.canvas.width / rect.width : 1;
+    for (const ann of this.annotations) {
+      if (ann.type === 'sticky' && ann.startPoint) {
+        const w = ann.endPoint ? Math.max(150, ann.endPoint.x - ann.startPoint.x) : 210;
+        const h = ann.endPoint ? Math.max(96, ann.endPoint.y - ann.startPoint.y) : 120;
+        drawStickyNoteOnCanvas(octx, {
+          x: offsetX + ann.startPoint.x,
+          y: offsetY + ann.startPoint.y,
+          width: w * scale,
+          height: h * scale,
+          text: ann.text || '',
+          theme: ann.stickyTheme,
+          scale,
+        });
+      }
+    }
+  }
+
   async exportAnnotatedScreenshot(
     baseImageUrl: string,
     cropBox?: { x: number; y: number; width: number; height: number }
@@ -907,6 +1126,22 @@ export class MarkupStudio {
 
     octx.drawImage(img, 0, 0, offscreen.width, offscreen.height);
     octx.drawImage(this.canvas, 0, 0);
+
+    for (const ann of this.annotations) {
+      if (ann.type === 'sticky' && ann.startPoint) {
+        const w = ann.endPoint ? Math.max(150, ann.endPoint.x - ann.startPoint.x) : 210;
+        const h = ann.endPoint ? Math.max(96, ann.endPoint.y - ann.startPoint.y) : 120;
+        drawStickyNoteOnCanvas(octx, {
+          x: ann.startPoint.x,
+          y: ann.startPoint.y,
+          width: w,
+          height: h,
+          text: ann.text || '',
+          theme: ann.stickyTheme,
+          scale: 1,
+        });
+      }
+    }
 
     if (cropBox && cropBox.width > 0 && cropBox.height > 0) {
       const pad = 40;
@@ -928,6 +1163,7 @@ export class MarkupStudio {
 
   destroy() {
     this.canvas.remove();
+    this.stickyHost.remove();
     document.getElementById('letme-inline-text-input')?.remove();
   }
 }

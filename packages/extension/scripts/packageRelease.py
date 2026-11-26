@@ -3,12 +3,20 @@ import os
 import sys
 import zipfile
 import hashlib
+import json
 
 def main():
     root_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '../../..'))
     dist_dir = os.path.join(root_dir, 'packages/extension/dist')
+    manifest_path = os.path.join(root_dir, 'packages/extension/manifest.json')
+    version = '3.0.0'
+    if os.path.exists(manifest_path):
+        with open(manifest_path, 'r', encoding='utf-8') as mf:
+            version = json.load(mf).get('version', version)
+
     release_dir = os.path.join(root_dir, 'release')
-    zip_path = os.path.join(release_dir, 'letme-extension-v0.1.0.zip')
+    zip_name = f'letme-extension-v{version}.zip'
+    zip_path = os.path.join(release_dir, zip_name)
 
     if not os.path.exists(dist_dir):
         print(f"[letme-release] Error: Directory {dist_dir} does not exist. Run 'npm run build' first.", file=sys.stderr)
@@ -31,7 +39,7 @@ def main():
 
     print("----------------------------------------------------")
     print("✓ Release Package Created Successfully!")
-    print(f"- File:    release/letme-extension-v0.1.0.zip")
+    print(f"- File:    release/{zip_name}")
     print(f"- Size:    {size / 1024:.2f} KB ({size} bytes)")
     print(f"- SHA-256: {sha256}")
     print("----------------------------------------------------")

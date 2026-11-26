@@ -3,13 +3,26 @@ import {
   LayoutBugReport,
   MarkupAnnotation,
   McpSnapshotSummary,
+  SemanticAnchors,
+  SourceContextInfo,
 } from '@letme/shared';
 import { MarkupTool } from './markupStudio.js';
 import { getLucideSvg } from '../icons.js';
+import { ScreenshotLayerItem } from './scrEditorModal.js';
 
 export type LayerTag = 'bug' | 'design' | 'edit' | 'note';
 export type StudioTool = 'idle' | 'pick' | 'hand' | Exclude<MarkupTool, 'select'>;
 export type ShapeToolId = 'box' | 'rounded-box' | 'circle' | 'diamond' | 'triangle' | 'callout';
+export type InspectorTab = 'layers' | 'scr' | 'ai';
+export type ScrCaptureMode = 'area' | 'full' | 'layer' | 'delay';
+
+export interface ScrConfig {
+  includeMarkup: boolean;
+  hideHud: boolean;
+  padding: 0 | 16 | 32;
+  format: 'png' | 'jpeg';
+  autoCopy: boolean;
+}
 
 export interface CopyHistoryItem {
   id: string;
@@ -31,6 +44,8 @@ export interface PickedLayer {
   note: string;
   visible: boolean;
   thumbnailDataUrl?: string;
+  sourceContext?: SourceContextInfo;
+  semanticAnchors?: SemanticAnchors;
   annotations: MarkupAnnotation[];
 }
 
@@ -53,13 +68,29 @@ export interface StudioViewState {
   finalInstructions: string;
   isRightSliderOpen: boolean;
   rightSliderTab: 'mcp' | 'history';
+  inspectorTab: InspectorTab;
+  scrConfig: ScrConfig;
+  screenshots: ScreenshotLayerItem[];
+  aiSummary: { provider: string; model: string; hasKey: boolean };
   mcpSnapshots: McpSnapshotSummary[];
   copyHistory: CopyHistoryItem[];
 }
 
 export interface OverlayCallbacks {
   onSelectLayer: (layerId: string) => void;
+  onCopyLayer: (layerId: string) => void;
   onOpenLayerRaw: (layerId: string) => void;
+  onSwitchInspectorTab: (tab: InspectorTab) => void;
+  onRunScrCapture: (mode: ScrCaptureMode) => void;
+  onToggleScrOption: (key: 'includeMarkup' | 'hideHud' | 'autoCopy') => void;
+  onCycleScrPadding: () => void;
+  onToggleScrFormat: () => void;
+  onEditScreenshot: (id: string) => void;
+  onCopyScreenshot: (id: string) => void;
+  onDownloadScreenshot: (id: string) => void;
+  onSendScreenshotToAi: (id: string) => void;
+  onDeleteScreenshot: (id: string) => void;
+  onRunAiVisionScan: () => void;
   onOpenFullRaw: () => void;
   onDeleteLayer: (layerId: string) => void;
   onClearAllLayers: () => void;
@@ -376,8 +407,38 @@ const HUD_CSS = `
 
   /* Full-Height Right Slider */
   .hud-right-slider {
-    position: fixed; top: 16px; right: 16px; bottom: 16px; z-index: 2147483647;
+    position: fixed; top: 16px; right: 16px; bottom: 68px; z-index: 2147483647;
     width: 324px; border-radius: 12px; display: flex; flex-direction: column; overflow: hidden;
+  }
+  .hud-exit-fab {
+    position: fixed; bottom: 18px; right: 18px; z-index: 2147483647;
+    width: 38px; height: 38px; border-radius: 9999px;
+    background: #ef4444; border: 1.5px solid rgba(255, 255, 255, 0.85); color: #ffffff;
+    display: flex; align-items: center; justify-content: center; cursor: pointer;
+    opacity: 0.28; transition: opacity 0.18s ease, transform 0.15s ease, box-shadow 0.15s ease;
+  }
+  .hud-exit-fab:hover {
+    opacity: 1; transform: scale(1.08);
+    box-shadow: 0 8px 24px rgba(239, 68, 68, 0.55);
+  }
+  .studio-tabs {
+    display: grid; grid-template-columns: repeat(3, 1fr); gap: 3px;
+    padding: 6px 12px 0; background: #08080a;
+  }
+  .studio-tab {
+    padding: 5px 6px; border-radius: 5px; border: 1px solid #27272a; background: #050505;
+    color: #a1a1aa; font-size: 10px; font-weight: 700; cursor: pointer; text-align: center;
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  }
+  .studio-tab:hover { color: #ffffff; border-color: #3f3f46; }
+  .studio-tab.active { background: #ffffff; color: #000000; border-color: #ffffff; }
+  .studio-panel-card {
+    border: 1px solid #2e2e32; border-radius: 6px; background: rgba(5,5,5,0.92);
+    padding: 10px; display: flex; flex-direction: column; gap: 8px;
+  }
+  .scr-row {
+    display: flex; align-items: center; justify-content: space-between;
+    font-size: 11px; color: #d4d4d8;
   }
   .rs-head {
     padding: 10px 12px; background: #050505; border-bottom: 1px dashed #2e2e32;
@@ -494,6 +555,9 @@ export class OverlayUi {
           <button class="tb-btn ${state.activeTool === 'text' ? 'active' : ''}" data-tool="text" title="Text (T)">
             ${getLucideSvg('type', { size: 15 })}<span class="tb-key">T</span>
           </button>
+          <button class="tb-btn ${state.activeTool === 'sticky' ? 'active' : ''}" data-tool="sticky" title="Sticky Note (N)">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V8Z"/><path d="M15 3v4a2 2 0 0 0 2 2h4"/></svg><span class="tb-key">N</span>
+          </button>
           <button class="tb-btn ${state.activeTool === 'blur' ? 'active' : ''}" data-tool="blur" title="Censored Blur (U)">
             ${LOCK_CENSOR_SVG}<span class="tb-key">U</span>
           </button>
@@ -590,21 +654,115 @@ export class OverlayUi {
                   <div class="layer-thumb">${thumbHtml}</div>
                   <div class="layer-info">
                     <div class="layer-top">
-                      <span class="layer-idx">#${layer.index}</span>
-                      <span class="layer-name">&lt;${layer.tagName}&gt; ${layer.selector}</span>
+                      <span class="layer-name" style="font-weight:700;">Layer ${layer.index}</span>
+                      <span class="layer-tag-badge">${layer.tag}</span>
                     </div>
                     <div class="layer-sub">
-                      <span class="layer-tag-badge">${layer.tag}</span>
-                      <span>${layer.boxModel.width}×${layer.boxModel.height}</span>
+                      <span>&lt;${layer.tagName}&gt;</span>
+                      <span>· ${layer.boxModel.width}×${layer.boxModel.height}</span>
                       <span>· ${layer.annotations.length} mark</span>
                     </div>
                   </div>
-                  <button class="layer-raw-btn" data-raw-id="${layer.id}" title="Preview Raw for Layer #${layer.index}">Raw</button>
+                  <button class="layer-trash" data-copy-id="${layer.id}" title="Copy Prompt for Layer ${layer.index}">${getLucideSvg('copy', { size: 12 })}</button>
+                  <button class="layer-raw-btn" data-raw-id="${layer.id}" title="Preview Raw for Layer ${layer.index}">Raw</button>
                   <button class="layer-trash" data-del-id="${layer.id}" title="Delete Layer">${getLucideSvg('trash-2', { size: 13 })}</button>
                 </div>
               `;
             })
             .join('');
+
+    let drawerTabBody = '';
+    if (state.inspectorTab === 'layers') {
+      drawerTabBody = `
+        <div class="section-head">
+          <span>Layers (${state.layers.length})</span>
+          <span>Click layer to edit</span>
+        </div>
+        <div class="layers-box">${layersHtml}</div>
+        <div class="final-notes-wrap">
+          <button id="btn-toggle-final-notes" class="final-toggle-btn">
+            <span>Additional Final Instructions</span>
+            <span>${state.isFinalNotesOpen ? '▴' : '▾'}</span>
+          </button>
+          ${
+            state.isFinalNotesOpen
+              ? `<textarea id="final-instructions-input" class="note-input" style="min-height:48px;" placeholder="Instruksi tambahan di akhir prompt (opsional)...">${this.escapeHtml(state.finalInstructions)}</textarea>`
+              : ''
+          }
+        </div>
+      `;
+    } else if (state.inspectorTab === 'scr') {
+      const scrListHtml =
+        state.screenshots.length === 0
+          ? `<div class="layers-empty">No screenshots captured yet. Use modes above!</div>`
+          : state.screenshots
+              .map(
+                (s) => `
+                <div class="layer-row">
+                  <div class="layer-thumb"><img src="${s.dataUrl}" alt="${s.name}" /></div>
+                  <div class="layer-info">
+                    <div class="layer-top">
+                      <span class="layer-name" style="font-weight:700;">${s.name}</span>
+                      <span class="layer-tag-badge">${s.mode}</span>
+                    </div>
+                    <div class="layer-sub"><span>${s.width}×${s.height}px</span></div>
+                  </div>
+                  <button class="layer-raw-btn" data-scr-edit="${s.id}" title="Edit / Annotate">Edit</button>
+                  <button class="layer-trash" data-scr-copy="${s.id}" title="Copy Image">${getLucideSvg('copy', { size: 12 })}</button>
+                  <button class="layer-trash" data-scr-dl="${s.id}" title="Download">${getLucideSvg('download', { size: 12 })}</button>
+                  <button class="layer-trash" data-scr-send="${s.id}" title="Send to AI">${getLucideSvg('zap', { size: 12 })}</button>
+                  <button class="layer-trash" data-scr-del="${s.id}" title="Delete">${getLucideSvg('trash-2', { size: 12 })}</button>
+                </div>
+              `
+              )
+              .join('');
+
+      drawerTabBody = `
+        <div class="section-head"><span>Capture Modes</span><span>Pre-markup ready</span></div>
+        <div class="studio-panel-card">
+          <div class="rs-output-row">
+            <button id="btn-scr-area" class="rs-btn-sec">${getLucideSvg('crop', { size: 13 })} Area Crop</button>
+            <button id="btn-scr-full" class="rs-btn-pri">${getLucideSvg('maximize', { size: 13, color: '#000000' })} Full View</button>
+          </div>
+          <div class="rs-output-row">
+            <button id="btn-scr-layer" class="rs-btn-sec">${getLucideSvg('layers', { size: 13 })} Active Layer</button>
+            <button id="btn-scr-delay" class="rs-btn-sec">⏱ Delay 3s</button>
+          </div>
+          <div class="scr-row">
+            <span>Include Canvas Markups</span>
+            <button id="btn-scr-markup" class="toggle-chip ${state.scrConfig.includeMarkup ? 'active' : ''}">${state.scrConfig.includeMarkup ? 'ON' : 'OFF'}</button>
+          </div>
+          <div class="scr-row">
+            <span>Hide Studio HUD</span>
+            <button id="btn-scr-hidehud" class="toggle-chip ${state.scrConfig.hideHud ? 'active' : ''}">${state.scrConfig.hideHud ? 'ON' : 'OFF'}</button>
+          </div>
+          <div class="scr-row">
+            <span>Layer Pad / Format / Copy</span>
+            <div style="display:flex; gap:4px;">
+              <button id="btn-scr-pad" class="toggle-chip">${state.scrConfig.padding}px</button>
+              <button id="btn-scr-fmt" class="toggle-chip">${state.scrConfig.format.toUpperCase()}</button>
+              <button id="btn-scr-autocopy" class="toggle-chip ${state.scrConfig.autoCopy ? 'active' : ''}">Copy</button>
+            </div>
+          </div>
+        </div>
+        <div class="section-head"><span>Screenshot Layers (${state.screenshots.length})</span><span>Click Edit to customize</span></div>
+        <div class="layers-box">${scrListHtml}</div>
+      `;
+    } else {
+      drawerTabBody = `
+        <div class="section-head"><span>AI Vision Studio</span><span>${this.escapeHtml(state.aiSummary.provider)}</span></div>
+        <div class="studio-panel-card">
+          <div class="props-meta">
+            Provider: <b>${this.escapeHtml(state.aiSummary.provider)}</b><br/>
+            Model: <b>${this.escapeHtml(state.aiSummary.model)}</b><br/>
+            API Key: <b>${state.aiSummary.hasKey ? 'Configured' : 'Not Set (Open Popup Settings)'}</b>
+          </div>
+          <button id="btn-run-ai-scan" class="rs-btn-pri" style="width:100%;">
+            ${getLucideSvg('bot', { size: 14, color: '#000000' })} Scan Page with AI Vision
+          </button>
+        </div>
+      `;
+    }
 
     const drawerHtml = state.isDrawerOpen
       ? `
@@ -612,7 +770,7 @@ export class OverlayUi {
           <div class="drawer-head">
             <div class="brand-wrap">
               <img class="brand-logo" src="${logoUrl}" alt="LetMe" />
-              <span class="brand-title">LetMe Inspector</span>
+              <span class="brand-title">LetMe Studio</span>
             </div>
             <div style="display:flex; gap:4px; align-items:center;">
               <button id="btn-full-raw" class="toggle-chip" title="Preview Full Prompt">Raw</button>
@@ -620,23 +778,13 @@ export class OverlayUi {
               <button id="btn-clear-all-layers" class="toggle-chip danger" title="Clear All Layers">${getLucideSvg('trash-2', { size: 12 })}</button>
             </div>
           </div>
+          <div class="studio-tabs">
+            <button class="studio-tab ${state.inspectorTab === 'layers' ? 'active' : ''}" data-ins-tab="layers">Layers</button>
+            <button class="studio-tab ${state.inspectorTab === 'scr' ? 'active' : ''}" data-ins-tab="scr">SCR</button>
+            <button class="studio-tab ${state.inspectorTab === 'ai' ? 'active' : ''}" data-ins-tab="ai">AI Vision</button>
+          </div>
           <div class="drawer-body">
-            <div class="section-head">
-              <span>Layers (${state.layers.length})</span>
-              <span>Click layer to edit</span>
-            </div>
-            <div class="layers-box">${layersHtml}</div>
-            <div class="final-notes-wrap">
-              <button id="btn-toggle-final-notes" class="final-toggle-btn">
-                <span>Additional Final Instructions</span>
-                <span>${state.isFinalNotesOpen ? '▴' : '▾'}</span>
-              </button>
-              ${
-                state.isFinalNotesOpen
-                  ? `<textarea id="final-instructions-input" class="note-input" style="min-height:48px;" placeholder="Instruksi tambahan di akhir prompt (opsional)...">${this.escapeHtml(state.finalInstructions)}</textarea>`
-                  : ''
-              }
-            </div>
+            ${drawerTabBody}
           </div>
         </aside>
       `
@@ -722,7 +870,6 @@ export class OverlayUi {
               <button id="btn-copy" class="rs-btn-sec">${getLucideSvg('copy', { size: 12 })} Copy</button>
               <button id="btn-send" class="rs-btn-pri">${getLucideSvg('zap', { size: 12, color: '#000000' })} Send to AI</button>
             </div>
-            <button id="btn-close-studio" class="rs-btn-exit">${EXIT_SVG} Close Inspector Studio</button>
           </div>
           <div class="rs-tabs-bar">
             <div class="mcp-sb-tabs">
@@ -751,6 +898,7 @@ export class OverlayUi {
       ${drawerHtml}
       ${propsModalHtml}
       ${rightSliderHtml}
+      <button id="btn-floating-exit" class="hud-exit-fab" title="Close Pick Studio">${getLucideSvg('x', { size: 18, color: '#ffffff' })}</button>
     `;
 
     this.bindEvents(state);
@@ -784,7 +932,40 @@ export class OverlayUi {
     this.shadow.getElementById('btn-mcp-refresh')?.addEventListener('click', () => this.callbacks.onRefreshMcpSnapshots());
     this.shadow.getElementById('btn-copy')?.addEventListener('click', () => this.callbacks.onCopyPrompt());
     this.shadow.getElementById('btn-send')?.addEventListener('click', () => this.callbacks.onSendToAi());
-    this.shadow.getElementById('btn-close-studio')?.addEventListener('click', () => this.callbacks.onClose());
+    this.shadow.getElementById('btn-floating-exit')?.addEventListener('click', () => this.callbacks.onClose());
+    this.shadow.getElementById('btn-scr-area')?.addEventListener('click', () => this.callbacks.onRunScrCapture('area'));
+    this.shadow.getElementById('btn-scr-full')?.addEventListener('click', () => this.callbacks.onRunScrCapture('full'));
+    this.shadow.getElementById('btn-scr-layer')?.addEventListener('click', () => this.callbacks.onRunScrCapture('layer'));
+    this.shadow.getElementById('btn-scr-delay')?.addEventListener('click', () => this.callbacks.onRunScrCapture('delay'));
+    this.shadow.getElementById('btn-scr-markup')?.addEventListener('click', () => this.callbacks.onToggleScrOption('includeMarkup'));
+    this.shadow.getElementById('btn-scr-hidehud')?.addEventListener('click', () => this.callbacks.onToggleScrOption('hideHud'));
+    this.shadow.getElementById('btn-scr-autocopy')?.addEventListener('click', () => this.callbacks.onToggleScrOption('autoCopy'));
+    this.shadow.getElementById('btn-scr-pad')?.addEventListener('click', () => this.callbacks.onCycleScrPadding());
+    this.shadow.getElementById('btn-scr-fmt')?.addEventListener('click', () => this.callbacks.onToggleScrFormat());
+    this.shadow.getElementById('btn-run-ai-scan')?.addEventListener('click', () => this.callbacks.onRunAiVisionScan());
+
+    this.shadow.querySelectorAll<HTMLButtonElement>('[data-scr-edit]').forEach((b) =>
+      b.addEventListener('click', () => b.dataset.scrEdit && this.callbacks.onEditScreenshot(b.dataset.scrEdit))
+    );
+    this.shadow.querySelectorAll<HTMLButtonElement>('[data-scr-copy]').forEach((b) =>
+      b.addEventListener('click', () => b.dataset.scrCopy && this.callbacks.onCopyScreenshot(b.dataset.scrCopy))
+    );
+    this.shadow.querySelectorAll<HTMLButtonElement>('[data-scr-dl]').forEach((b) =>
+      b.addEventListener('click', () => b.dataset.scrDl && this.callbacks.onDownloadScreenshot(b.dataset.scrDl))
+    );
+    this.shadow.querySelectorAll<HTMLButtonElement>('[data-scr-send]').forEach((b) =>
+      b.addEventListener('click', () => b.dataset.scrSend && this.callbacks.onSendScreenshotToAi(b.dataset.scrSend))
+    );
+    this.shadow.querySelectorAll<HTMLButtonElement>('[data-scr-del]').forEach((b) =>
+      b.addEventListener('click', () => b.dataset.scrDel && this.callbacks.onDeleteScreenshot(b.dataset.scrDel))
+    );
+
+    this.shadow.querySelectorAll<HTMLButtonElement>('[data-ins-tab]').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        const tab = btn.dataset.insTab as InspectorTab;
+        if (tab) this.callbacks.onSwitchInspectorTab(tab);
+      });
+    });
 
     this.shadow.querySelectorAll<HTMLButtonElement>('[data-tool]').forEach((btn) => {
       btn.addEventListener('click', () => {
@@ -843,9 +1024,17 @@ export class OverlayUi {
     this.shadow.querySelectorAll<HTMLElement>('[data-layer-id]').forEach((row) => {
       row.addEventListener('click', (e) => {
         const target = e.target as HTMLElement;
-        if (target.closest('[data-eye-id]') || target.closest('[data-del-id]') || target.closest('[data-raw-id]')) return;
+        if (target.closest('[data-eye-id]') || target.closest('[data-del-id]') || target.closest('[data-raw-id]') || target.closest('[data-copy-id]')) return;
         const id = row.dataset.layerId;
         if (id) this.callbacks.onSelectLayer(id);
+      });
+    });
+
+    this.shadow.querySelectorAll<HTMLButtonElement>('[data-copy-id]').forEach((btn) => {
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const id = btn.dataset.copyId;
+        if (id) this.callbacks.onCopyLayer(id);
       });
     });
 
@@ -931,6 +1120,12 @@ export class OverlayUi {
       toast.style.transition = 'opacity 0.35s ease';
       setTimeout(() => toast.remove(), 350);
     }, 2200);
+  }
+
+  setHostVisible(visible: boolean) {
+    if (this.host) {
+      this.host.style.display = visible ? '' : 'none';
+    }
   }
 
   remove() {

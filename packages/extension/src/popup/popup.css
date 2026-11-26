@@ -263,7 +263,34 @@ body {
 .btn-left {
   display: inline-flex;
   align-items: center;
-  gap: 7px;
+  gap: 8px;
+  min-width: 0;
+}
+
+.btn-text-stack {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  min-width: 0;
+  text-align: left;
+}
+
+.btn-title-row {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.btn-subtext {
+  font-size: 10px;
+  font-weight: 400;
+  color: #a1a1aa;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 195px;
 }
 
 .kbd-chip {

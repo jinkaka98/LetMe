@@ -10,11 +10,12 @@ import { handleListInspections } from './tools/listInspections.js';
 import { handleApplyCssPreview } from './tools/applyCssPreview.js';
 import { handleClearPreview } from './tools/clearPreview.js';
 import { handleGetConsoleLogs } from './tools/getConsoleLogs.js';
+import { handleResolveInspection } from './tools/resolveInspection.js';
 
 const server = new Server(
   {
     name: 'letme-mcp-server',
-    version: '0.1.0',
+    version: '3.0.0',
   },
   {
     capabilities: {
@@ -97,6 +98,24 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
           properties: {},
         },
       },
+      {
+        name: 'letme_resolve_inspection',
+        description:
+          'Marks an inspected element snapshot as resolved after applying the requested code or style fixes.',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            id: {
+              type: 'string',
+              description: 'Optional snapshot ID to resolve. If omitted, resolves the latest active element.',
+            },
+            resolutionNote: {
+              type: 'string',
+              description: 'Short summary of the files edited or fix applied.',
+            },
+          },
+        },
+      },
     ],
   };
 });
@@ -121,6 +140,9 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
 
       case 'letme_get_console_logs':
         return handleGetConsoleLogs();
+
+      case 'letme_resolve_inspection':
+        return handleResolveInspection(args as any);
 
       default:
         throw new Error(`Unknown LetMe tool: ${name}`);

@@ -48,6 +48,12 @@ export default defineConfig({
           manifest.content_scripts = [
             {
               matches: ['<all_urls>'],
+              js: ['mainWorldBridge.js'],
+              run_at: 'document_start',
+              world: 'MAIN',
+            },
+            {
+              matches: ['<all_urls>'],
               js: ['contentScript.js'],
               run_at: 'document_idle',
             },

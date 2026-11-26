@@ -7,6 +7,7 @@ function formatAnnotationDetail(ann: MarkupAnnotation, index: number): string {
   const rotInfo = ann.rotation ? ` [rotated ${Math.round((ann.rotation * 180) / Math.PI)}°]` : '';
   let detail = '';
   if (ann.type === 'text') detail = `"${ann.text || ''}"`;
+  else if (ann.type === 'sticky') detail = `Sticky Note [${ann.stickyTheme || 'amber'}]: "${ann.text || ''}"`;
   else if (ann.type === 'ruler') detail = `Measured ${ann.text || '0px'}`;
   else if (ann.type === 'blur') detail = 'Censored / Redacted region';
   else if (ann.text) detail = ann.text;
@@ -43,11 +44,32 @@ export function handleGetActiveElement(id?: string) {
   const lines: string[] = [];
   lines.push(`# Inspected Element: <${element.tagName.toLowerCase()}> \`${element.selector}\``);
   lines.push(`- **Session / Report ID**: \`${element.id}\``);
+  lines.push(`- **Status**: \`${element.status || 'pending'}\`${element.resolutionNote ? ` (${element.resolutionNote})` : ''}`);
   lines.push(`- **Page Title**: ${element.pageTitle}`);
   lines.push(`- **URL**: ${element.url}`);
   lines.push(`- **Timestamp**: ${new Date(element.timestamp).toISOString()}`);
   lines.push(`- **Classes**: ${element.classNames.length > 0 ? element.classNames.map(c => `.${c}`).join(' ') : 'none'}`);
   lines.push('');
+
+  if (element.sourceContext) {
+    const sc = element.sourceContext;
+    lines.push(`## ⚛️ Component & Source Mapping:`);
+    lines.push(`- **Framework**: \`${sc.framework}\``);
+    if (sc.componentName) lines.push(`- **Component**: \`${sc.componentName}\``);
+    if (sc.ownerChain?.length) lines.push(`- **Owner Chain**: \`${sc.ownerChain.join(' -> ')}\``);
+    if (sc.filePath) lines.push(`- **Source File**: \`${sc.filePath}${sc.lineRange ? `:${sc.lineRange}` : ''}\``);
+    lines.push('');
+  }
+
+  if (element.semanticAnchors) {
+    const sa = element.semanticAnchors;
+    lines.push(`## 🧭 Semantic Anchors:`);
+    if (sa.nearestHeading) lines.push(`- **Nearest Heading**: "${sa.nearestHeading}"`);
+    if (sa.ariaLabel) lines.push(`- **aria-label**: "${sa.ariaLabel}"`);
+    if (sa.role) lines.push(`- **role**: \`${sa.role}\``);
+    if (sa.dataTestId) lines.push(`- **data-testid**: \`${sa.dataTestId}\``);
+    lines.push('');
+  }
 
   if (element.userInstructions) {
     lines.push(`## 🎯 User Desired Styling / Instruction:`);
@@ -130,6 +152,22 @@ export function handleGetActiveElement(id?: string) {
       lines.push(`- **Focus / Note**: ${layer.note?.trim() || 'N/A'}`);
       lines.push(`- **Size**: ${layer.boxModel.width}px × ${layer.boxModel.height}px (Pad: ${layer.boxModel.padding.top}/${layer.boxModel.padding.right}/${layer.boxModel.padding.bottom}/${layer.boxModel.padding.left}, Mar: ${layer.boxModel.margin.top}/${layer.boxModel.margin.right}/${layer.boxModel.margin.bottom}/${layer.boxModel.margin.left})`);
       lines.push(`- **Parent**: \`${layer.layoutContext.parentTagName}\` (\`${layer.layoutContext.parentSelector}\`, display: \`${layer.layoutContext.display}\`)`);
+      if (layer.sourceContext) {
+        const sc = layer.sourceContext;
+        const srcParts: string[] = [`Framework: \`${sc.framework}\``];
+        if (sc.componentName) srcParts.push(`Component: \`${sc.componentName}\``);
+        if (sc.ownerChain?.length) srcParts.push(`Chain: \`${sc.ownerChain.join(' -> ')}\``);
+        if (sc.filePath) srcParts.push(`File: \`${sc.filePath}${sc.lineRange ? `:${sc.lineRange}` : ''}\``);
+        lines.push(`- **Component & Source**: ${srcParts.join(' | ')}`);
+      }
+      if (layer.semanticAnchors) {
+        const sa = layer.semanticAnchors;
+        const anchors: string[] = [];
+        if (sa.nearestHeading) anchors.push(`Heading: "${sa.nearestHeading}"`);
+        if (sa.ariaLabel) anchors.push(`aria-label: "${sa.ariaLabel}"`);
+        if (sa.dataTestId) anchors.push(`data-testid: \`${sa.dataTestId}\``);
+        if (anchors.length > 0) lines.push(`- **Semantic Anchors**: ${anchors.join(' | ')}`);
+      }
       if (layer.layoutBugs.warnings.length > 0) {
         lines.push(`- **Layout Warnings**: ${layer.layoutBugs.warnings.join('; ')}`);
       }
