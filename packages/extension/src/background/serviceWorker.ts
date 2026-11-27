@@ -38,6 +38,7 @@ class ExtensionBridgeService {
   private ws: WebSocket | null = null;
   private isConnected: boolean = false;
   private reconnectTimer: any = null;
+  private reconnectDelayMs: number = 2000;
   private heartbeatTimer: any = null;
   private pendingMessages: ClientMessage[] = [];
   private port: number = DEFAULT_WS_PORT;
@@ -77,7 +78,8 @@ class ExtensionBridgeService {
 
     // Trigger connection if not already connecting
     if (!this.ws || this.ws.readyState >= WebSocket.CLOSING) {
-      this.connect();
+      this.reconnectDelayMs = 2000;
+      void this.connect();
     }
 
     return new Promise((resolve) => {
@@ -104,8 +106,28 @@ class ExtensionBridgeService {
     });
   }
 
-  connect() {
+  private async isBridgeReachable(): Promise<boolean> {
+    try {
+      await fetch(`http://127.0.0.1:${this.port}`, {
+        method: 'GET',
+        signal: AbortSignal.timeout(1000),
+      });
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  async connect() {
     if (this.ws && (this.ws.readyState === WebSocket.OPEN || this.ws.readyState === WebSocket.CONNECTING)) {
+      return;
+    }
+
+    const reachable = await this.isBridgeReachable();
+    if (!reachable) {
+      this.isConnected = false;
+      this.broadcastStatus(false);
+      this.scheduleReconnect();
       return;
     }
 
@@ -114,6 +136,7 @@ class ExtensionBridgeService {
 
       this.ws.onopen = async () => {
         this.isConnected = true;
+        this.reconnectDelayMs = 2000;
         console.log('[LetMe Background] Connected to MCP Bridge on ws://127.0.0.1:' + this.port);
         this.startHeartbeat();
         this.broadcastStatus(true);
@@ -153,14 +176,12 @@ class ExtensionBridgeService {
         this.isConnected = false;
         this.stopHeartbeat();
         this.broadcastStatus(false);
-        console.log('[LetMe Background] Bridge connection closed. Reconnecting in 1s...');
         this.scheduleReconnect();
       };
 
-      this.ws.onerror = (err) => {
+      this.ws.onerror = () => {
         this.isConnected = false;
         this.broadcastStatus(false);
-        console.warn('[LetMe Background] Bridge connection error:', err);
       };
     } catch {
       this.isConnected = false;
@@ -209,10 +230,12 @@ class ExtensionBridgeService {
 
   private scheduleReconnect() {
     if (this.reconnectTimer) return;
+    const delay = this.reconnectDelayMs;
+    this.reconnectDelayMs = Math.min(this.reconnectDelayMs * 2, 30000);
     this.reconnectTimer = setTimeout(() => {
       this.reconnectTimer = null;
-      this.connect();
-    }, 1000);
+      void this.connect();
+    }, delay);
   }
 
   send(message: ClientMessage) {
