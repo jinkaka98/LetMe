@@ -1,3 +1,4 @@
+import http from 'node:http';
 import { WebSocketServer, WebSocket } from 'ws';
 import {
   DEFAULT_WS_PORT,
@@ -9,6 +10,7 @@ import {
 import { globalStore } from './stateStore.js';
 
 export class WsBridge {
+  private httpServer: http.Server | null = null;
   private wss: WebSocketServer | null = null;
   private clients: Set<WebSocket> = new Set();
   private port: number;
@@ -20,12 +22,38 @@ export class WsBridge {
   start(): Promise<void> {
     return new Promise((resolve, reject) => {
       try {
-        this.wss = new WebSocketServer({ port: this.port, host: '127.0.0.1' });
+        this.httpServer = http.createServer((req, res) => {
+          const url = req.url || '/';
+          if (req.method === 'GET' && (url === '/' || url === '/health')) {
+            res.writeHead(200, {
+              'Content-Type': 'application/json',
+              'Access-Control-Allow-Origin': '*',
+            });
+            res.end(
+              JSON.stringify({
+                status: 'ok',
+                service: 'letme-mcp-bridge',
+                port: this.port,
+                connectedClients: this.clients.size,
+              }),
+            );
+            return;
+          }
+          res.writeHead(404, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ error: 'Not found' }));
+        });
 
-        this.wss.on('listening', () => {
-          // Log to stderr because MCP communication uses stdout!
-          console.error(`[LetMe WS Bridge] Listening on ws://127.0.0.1:${this.port}`);
-          resolve();
+        this.wss = new WebSocketServer({ noServer: true });
+
+        this.httpServer.on('upgrade', (request, socket, head) => {
+          this.wss?.handleUpgrade(request, socket, head, (ws) => {
+            this.wss?.emit('connection', ws, request);
+          });
+        });
+
+        this.httpServer.on('error', (err) => {
+          console.error('[LetMe WS Bridge] Server error:', err);
+          reject(err);
         });
 
         this.wss.on('connection', (ws: WebSocket, req) => {
@@ -53,9 +81,10 @@ export class WsBridge {
           });
         });
 
-        this.wss.on('error', (err) => {
-          console.error('[LetMe WS Bridge] Server error:', err);
-          reject(err);
+        this.httpServer.listen(this.port, '127.0.0.1', () => {
+          // Log to stderr because MCP communication uses stdout!
+          console.error(`[LetMe WS Bridge] Listening on http://127.0.0.1:${this.port} (HTTP + WS)`);
+          resolve();
         });
       } catch (err) {
         reject(err);
@@ -193,9 +222,14 @@ export class WsBridge {
       this.wss.close();
       this.wss = null;
     }
+    if (this.httpServer) {
+      this.httpServer.close();
+      this.httpServer = null;
+    }
   }
 }
 
+const rawPort = process.env.LETME_WS_PORT || process.env.LETME_PORT;
 export const wsBridge = new WsBridge(
-  process.env.LETME_PORT ? parseInt(process.env.LETME_PORT, 10) : DEFAULT_WS_PORT
+  rawPort ? parseInt(rawPort, 10) : DEFAULT_WS_PORT
 );

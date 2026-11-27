@@ -19,6 +19,9 @@
   },
   "author": "G assad S Eks Xixero1445 (https://github.com/jinkaka98)",
   "license": "MIT",
+  "publishConfig": {
+    "access": "public"
+  },
   "repository": {
     "type": "git",
     "url": "https://github.com/jinkaka98/LetMe.git"

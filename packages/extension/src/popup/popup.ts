@@ -46,21 +46,29 @@ const PROVIDER_PRESETS: Record<string, { baseUrl: string; defaultModel: string; 
 
 function buildIntegrationPrompt(port: number): string {
   const envBlock = port !== 8765 ? `,\n      "env": { "LETME_WS_PORT": "${port}" }` : '';
-  return `Connect LetMe MCP Server to this coding agent/harness using this configuration:
+  return `Connect LetMe MCP Server to this coding agent/harness.
 
+Note: \`@letme/mcp-server\` is not yet published on npmjs.org, so run it from a local clone (recommended) instead of \`npx\`:
+
+1. If you haven't cloned LetMe yet:
+\`\`\`bash
+git clone https://github.com/jinkaka98/LetMe.git && cd LetMe && npm install && npm run build:shared && npm run build
+\`\`\`
+
+2. Add this to your MCP configuration (replace \`<PATH_TO_LETME>\` with the cloned folder path):
 \`\`\`json
 {
   "mcpServers": {
     "letme": {
-      "command": "npx",
-      "args": ["-y", "@letme/mcp-server"]${envBlock}
+      "command": "node",
+      "args": ["<PATH_TO_LETME>/packages/mcp-server/dist/index.js"]${envBlock}
     }
   }
 }
 \`\`\`
 
-Local bridge endpoint: http://127.0.0.1:${port}
-Once connected, use \`letme_get_active_element\`, \`letme_list_inspections\`, \`letme_apply_css_preview\`, and \`letme_clear_preview\` to inspect and debug UI live.`;
+Local bridge endpoint: http://127.0.0.1:${port}/health
+Once connected, use \`letme_get_active_element\`, \`letme_list_inspections\`, \`letme_apply_css_preview\`, \`letme_clear_preview\`, \`letme_get_console_logs\`, and \`letme_resolve_inspection\` to inspect and debug UI live.`;
 }
 
 function init() {

@@ -99,25 +99,26 @@ flowchart LR
 
 Anda dapat menjalankan LetMe MCP Bridge secara instan menggunakan `npx` atau mengkloning repositori untuk membangun ekstensi Chrome dan server secara lokal dari source code.
 
-#### Pilihan A: Peluncuran Cepat via NPX (Tanpa Kloning)
-Konfigurasikan klien AI Anda (Cursor, Claude, Antigravity) untuk langsung menjalankan server via `npx`:
+#### Pilihan A: Jalankan Secara Lokal via Node.js (Direkomendasikan)
+Clone dan build repositori sekali saja:
+```bash
+git clone https://github.com/jinkaka98/LetMe.git && cd LetMe && npm install && npm run build:shared && npm run build
+```
+
+Lalu konfigurasikan klien AI Anda (Antigravity, Cursor, Claude, Windsurf) agar mengarah ke server MCP hasil build:
 
 ```json
 {
   "mcpServers": {
     "letme": {
-      "command": "npx",
-      "args": ["-y", "@letme/mcp-server"]
+      "command": "node",
+      "args": ["<PATH_TO_LETME>/packages/mcp-server/dist/index.js"]
     }
   }
 }
 ```
 
-Atau pasang secara global di komputer Anda:
-```bash
-npm install -g @letme/mcp-server
-letme-mcp
-```
+> **Catatan**: Setelah `@letme/mcp-server` di-publish ke npmjs.org, `"command": "npx", "args": ["-y", "@letme/mcp-server"]` juga dapat digunakan langsung.
 
 #### Pilihan B: Kloning & Bangun dari Source (Ekstensi Penuh + Server)
 ```bash
