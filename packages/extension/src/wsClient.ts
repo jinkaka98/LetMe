@@ -4,7 +4,7 @@ import {
   ServerMessage,
   ElementSnapshot,
   LivePreviewResult,
-} from '@letme/shared';
+} from 'letme-shared';
 import { livePreviewManager } from './content/livePreview.js';
 
 export type ConnectionState = 'connected' | 'connecting' | 'disconnected';

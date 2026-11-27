@@ -2,7 +2,7 @@ import {
   CustomShortcutsConfig,
   DEFAULT_CUSTOM_SHORTCUTS,
   ShortcutActionId,
-} from '@letme/shared';
+} from 'letme-shared';
 import {
   formatChordFromSet,
   formatChordPreview,
@@ -46,22 +46,14 @@ const PROVIDER_PRESETS: Record<string, { baseUrl: string; defaultModel: string; 
 
 function buildIntegrationPrompt(port: number): string {
   const envBlock = port !== 8765 ? `,\n      "env": { "LETME_WS_PORT": "${port}" }` : '';
-  return `Connect LetMe MCP Server to this coding agent/harness.
+  return `Connect LetMe MCP Server to this coding agent/harness using this configuration:
 
-Note: \`@letme/mcp-server\` is not yet published on npmjs.org, so run it from a local clone (recommended) instead of \`npx\`:
-
-1. If you haven't cloned LetMe yet:
-\`\`\`bash
-git clone https://github.com/jinkaka98/LetMe.git && cd LetMe && npm install && npm run build:shared && npm run build
-\`\`\`
-
-2. Add this to your MCP configuration (replace \`<PATH_TO_LETME>\` with the cloned folder path):
 \`\`\`json
 {
   "mcpServers": {
     "letme": {
-      "command": "node",
-      "args": ["<PATH_TO_LETME>/packages/mcp-server/dist/index.js"]${envBlock}
+      "command": "npx",
+      "args": ["-y", "letme-mcp-server"]${envBlock}
     }
   }
 }

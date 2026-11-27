@@ -99,26 +99,25 @@ flowchart LR
 
 You can run LetMe's MCP Bridge directly via `npx` (fastest) or clone the repository to build the full monorepo and Chrome Extension from source.
 
-#### Option A: Run Locally via Node.js (Recommended)
-Clone and build the repository once:
-```bash
-git clone https://github.com/jinkaka98/LetMe.git && cd LetMe && npm install && npm run build:shared && npm run build
-```
-
-Then configure your AI client (Antigravity, Cursor, Claude, Windsurf) to point to the built MCP server:
+#### Option A: Quick Launch via NPX (Zero Setup)
+Configure your AI client (Antigravity, Cursor, Claude, Windsurf) to spawn the server directly via `npx`:
 
 ```json
 {
   "mcpServers": {
     "letme": {
-      "command": "node",
-      "args": ["<PATH_TO_LETME>/packages/mcp-server/dist/index.js"]
+      "command": "npx",
+      "args": ["-y", "letme-mcp-server"]
     }
   }
 }
 ```
 
-> **Note**: Once `@letme/mcp-server` is published to npmjs.org, `"command": "npx", "args": ["-y", "@letme/mcp-server"]` can also be used directly.
+Or install globally:
+```bash
+npm install -g letme-mcp-server
+letme-mcp
+```
 
 #### Option B: Clone & Build from Source (Full Extension + MCP Bridge)
 ```bash

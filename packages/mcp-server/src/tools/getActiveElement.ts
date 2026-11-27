@@ -1,5 +1,5 @@
 import { globalStore } from '../stateStore.js';
-import { ElementSnapshot, MarkupAnnotation } from '@letme/shared';
+import { ElementSnapshot, MarkupAnnotation } from 'letme-shared';
 
 function formatAnnotationDetail(ann: MarkupAnnotation, index: number): string {
   const colorInfo = ann.color ? ` [${ann.color}]` : '';

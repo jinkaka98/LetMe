@@ -3,7 +3,7 @@ import {
   ConsoleLogEntry,
   LivePreviewRequest,
   LivePreviewResult,
-} from '@letme/shared';
+} from 'letme-shared';
 
 export interface ConnectedTabInfo {
   id: string;

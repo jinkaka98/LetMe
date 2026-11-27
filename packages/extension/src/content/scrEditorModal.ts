@@ -1,4 +1,4 @@
-import { MarkupAnnotation } from '@letme/shared';
+import { MarkupAnnotation } from 'letme-shared';
 import { getLucideSvg } from '../icons.js';
 import { MarkupStudio, MarkupTool } from './markupStudio.js';
 

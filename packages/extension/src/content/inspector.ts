@@ -29,7 +29,7 @@ import {
   McpSnapshotSummary,
   SemanticAnchors,
   SourceContextInfo,
-} from '@letme/shared';
+} from 'letme-shared';
 
 const TOOL_HOTKEYS: Record<string, StudioTool> = {
   h: 'hand',

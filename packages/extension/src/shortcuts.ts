@@ -1,4 +1,4 @@
-import { CustomShortcutsConfig, DEFAULT_CUSTOM_SHORTCUTS } from '@letme/shared';
+import { CustomShortcutsConfig, DEFAULT_CUSTOM_SHORTCUTS } from 'letme-shared';
 
 export const SHORTCUTS_STORAGE_KEY = 'customShortcuts';
 

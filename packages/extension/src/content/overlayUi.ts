@@ -5,7 +5,7 @@ import {
   McpSnapshotSummary,
   SemanticAnchors,
   SourceContextInfo,
-} from '@letme/shared';
+} from 'letme-shared';
 import { MarkupTool } from './markupStudio.js';
 import { getLucideSvg } from '../icons.js';
 import { ScreenshotLayerItem } from './scrEditorModal.js';

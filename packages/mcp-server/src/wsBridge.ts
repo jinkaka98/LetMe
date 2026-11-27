@@ -6,7 +6,7 @@ import {
   ServerMessage,
   LivePreviewRequest,
   LivePreviewResult,
-} from '@letme/shared';
+} from 'letme-shared';
 import { globalStore } from './stateStore.js';
 
 export class WsBridge {

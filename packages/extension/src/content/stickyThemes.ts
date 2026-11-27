@@ -1,4 +1,4 @@
-import { StickyNoteThemeId } from '@letme/shared';
+import { StickyNoteThemeId } from 'letme-shared';
 
 export interface StickyThemeSpec {
   id: StickyNoteThemeId;

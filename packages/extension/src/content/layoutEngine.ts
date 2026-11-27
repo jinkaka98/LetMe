@@ -2,7 +2,7 @@ import {
   BoxModelMetrics,
   ContainerLayoutContext,
   LayoutBugReport,
-} from '@letme/shared';
+} from 'letme-shared';
 
 export function getBoxModel(el: HTMLElement): BoxModelMetrics {
   const rect = el.getBoundingClientRect();

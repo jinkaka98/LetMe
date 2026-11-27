@@ -1,5 +1,5 @@
 {
-  "name": "@letme/shared",
+  "name": "letme-shared",
   "version": "3.0.0",
   "type": "module",
   "main": "./dist/index.js",

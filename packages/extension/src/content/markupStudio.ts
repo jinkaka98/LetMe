@@ -1,4 +1,4 @@
-import { MarkupAnnotation, MarkupPoint } from '@letme/shared';
+import { MarkupAnnotation, MarkupPoint } from 'letme-shared';
 import { drawStickyNoteOnCanvas, getNextStickyTheme, getStickyTheme } from './stickyThemes.js';
 
 export type MarkupTool =

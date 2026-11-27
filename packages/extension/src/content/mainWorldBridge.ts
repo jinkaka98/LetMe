@@ -1,4 +1,4 @@
-import { SourceContextInfo } from '@letme/shared';
+import { SourceContextInfo } from 'letme-shared';
 
 interface FiberNode {
   type?: any;

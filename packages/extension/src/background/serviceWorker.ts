@@ -5,7 +5,7 @@ import {
   LivePreviewResult,
   McpSnapshotSummary,
   ElementSnapshot,
-} from '@letme/shared';
+} from 'letme-shared';
 
 let localSnapshots: McpSnapshotSummary[] = [];
 

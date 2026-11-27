@@ -6,7 +6,7 @@ import { handleListInspections } from '../dist/tools/listInspections.js';
 import { handleClearPreview } from '../dist/tools/clearPreview.js';
 import { handleGetConsoleLogs } from '../dist/tools/getConsoleLogs.js';
 import { handleResolveInspection } from '../dist/tools/resolveInspection.js';
-import type { ElementSnapshot } from '@letme/shared';
+import type { ElementSnapshot } from 'letme-shared';
 
 test('StateStore stores and retrieves active element snapshot', () => {
   const store = new StateStore();

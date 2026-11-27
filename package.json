@@ -8,10 +8,10 @@
   ],
   "scripts": {
     "build": "npm run build --workspaces",
-    "build:shared": "npm run build --workspace=@letme/shared",
-    "build:server": "npm run build --workspace=@letme/mcp-server",
+    "build:shared": "npm run build --workspace=letme-shared",
+    "build:server": "npm run build --workspace=letme-mcp-server",
     "build:extension": "npm run build --workspace=@letme/extension",
-    "dev:server": "npm run dev --workspace=@letme/mcp-server",
+    "dev:server": "npm run dev --workspace=letme-mcp-server",
     "dev:extension": "npm run dev --workspace=@letme/extension",
     "start:server": "node packages/mcp-server/dist/index.js",
     "package:extension": "node packages/extension/scripts/packageRelease.js",

@@ -6,7 +6,7 @@ import {
   ConsoleLogEntry,
   CustomShortcutsConfig,
   DEFAULT_CUSTOM_SHORTCUTS,
-} from '@letme/shared';
+} from 'letme-shared';
 import {
   formatChordFromSet,
   mergeShortcutsConfig,
